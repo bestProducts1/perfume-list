@@ -1,10 +1,13 @@
 // ==========================================
+// 🔗 香水网站跳转目标 URL (请在此处填写你的香水网站完整链接)
+// ==========================================
+const PERFUME_SITE_URL = "https://bestproducts1.github.io/catalog/"; // 👈 改为你的香水网站链接// ==========================================
 // db.js - 产品数据管理中心
 // ==========================================
 
 // 🔴 请确保这个链接是您“发布到网络”后生成的 CSV 链接
 const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS_1tyfxYn_N6GiapL-T1u325G_A5L7YlrgAZKd92Nnl_7l12c5hDeur-9kwuE4RfBY4a9lZzNnqzc9/pub?gid=0&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRu7b5PXTT7XKOyfWf8zyQIE-uP0W6ZmuQh7e6BdsqQ-igpoLC_IMd-RWk6KBHFR0jJgic--5av7zGc/pubhtml";
 
 // 缓存时间 (1分钟)
 const CACHE_DURATION = 1 * 60 * 1000;

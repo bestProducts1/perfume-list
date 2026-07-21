@@ -993,6 +993,14 @@
       </div>
       <div class="sidebar-content">
         <nav>
+<nav>
+  <!-- 新增：跳转至香水网站链接 -->
+  <a class="menu-link" href="javascript:void(0)" onclick="goToPerfumeSite()" style="color: #b28900; font-weight: bold;">🌸 Visit Perfume Store</a>
+
+  <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
+  <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
+  ...
+</nav>
           <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
           <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
           <a
@@ -2280,5 +2288,12 @@
         );
       }
     </script>
+function goToPerfumeSite() {
+  if (typeof PERFUME_SITE_URL !== 'undefined' && PERFUME_SITE_URL) {
+    window.open(PERFUME_SITE_URL, '_blank');
+  } else {
+    alert("跳转网址未设置！");
+  }
+}
   </body>
 </html>
