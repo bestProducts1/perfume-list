@@ -992,77 +992,27 @@
         <div class="sidebar-tab active">MENU</div>
       </div>
       <div class="sidebar-content">
-        <nav>
-<nav>
-  <!-- 新增：跳转至香水网站链接 -->
-  <a class="menu-link" href="javascript:void(0)" onclick="goToPerfumeSite()" style="color: #b28900; font-weight: bold;">🌸 Visit Perfume Store</a>
-
-  <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
-  <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
-  ...
-</nav>
-          <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
-          <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
-          <a
-            class="menu-link"
-            onclick="handleMenuClick('Gender:Women')"
-            style="color: #c2185b"
-            >For Her 👩</a
-          >
-          <a
-            class="menu-link"
-            onclick="handleMenuClick('Gender:Men')"
-            style="color: #1565c0"
-            >For Him 👨</a
-          >
-          <a
-            class="menu-link"
-            onclick="handleMenuClick('Gender:Unisex')"
-            style="color: #455a64"
-            >Unisex ⚤</a
-          >
-          <a
-            class="menu-link"
-            onclick="scrollToBrand('Set')"
-            style="color: #6a1b9a"
-            >Gift Sets 🎁</a
-          >
-          <a class="menu-link" onclick="handleMenuClick('BestSellers')"
-            >Best Sellers 🔥</a
-          >
-          <a class="menu-link" onclick="handleMenuClick('New')"
-            >New Arrivals 🆕</a
-          >
-          <a class="menu-link" href="cart.html">My Cart</a>
-          <a
-            class="menu-link"
-            onclick="openTrackingModal()"
-            style="
-              color: #000;
-              border-top: 1px solid #eee;
-              margin-top: 10px;
-              padding-top: 20px;
-            "
-            >🚚 Track My Order</a
-          >
-          <a class="menu-link" href="https://wa.me/16232027321" target="_blank"
-            >Contact Us</a
-          >
-        </nav>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee" />
-        <div
-          style="
-            font-weight: 700;
-            margin-bottom: 15px;
-            font-size: 0.85rem;
-            color: #999;
-            letter-spacing: 1px;
-          "
-        >
-          POPULAR BRANDS
-        </div>
-        <div class="brand-list" id="brand-list-container"></div>
-        <div style="height: 50px"></div>
+  <nav>
+    <a class="menu-link" href="javascript:void(0)" onclick="goToPerfumeSite()" style="color: #b28900; font-weight: bold;">🌸 Visit Perfume Store</a>
+    <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
+    <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
+    <a class="menu-link" onclick="handleMenuClick('Gender:Women')" style="color: #c2185b">For Her 👩</a>
+    <a class="menu-link" onclick="handleMenuClick('Gender:Men')" style="color: #1565c0">For Him 👨</a>
+    <a class="menu-link" onclick="handleMenuClick('Gender:Unisex')" style="color: #455a64">Unisex ⚤</a>
+    <a class="menu-link" onclick="scrollToBrand('Set')" style="color: #6a1b9a">Gift Sets 🎁</a>
+    <a class="menu-link" onclick="handleMenuClick('BestSellers')">Best Sellers 🔥</a>
+    <a class="menu-link" onclick="handleMenuClick('New')">New Arrivals 🆕</a>
+    <a class="menu-link" href="cart.html">My Cart</a>
+    <a class="menu-link" onclick="openTrackingModal()" style="color: #000; border-top: 1px solid #eee; margin-top: 10px; padding-top: 20px;">🚚 Track My Order</a>
+    <a class="menu-link" href="https://wa.me/16232027321" target="_blank">Contact Us</a>
+  </nav>
+  <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee" />
+  <div style="font-weight: 700; margin-bottom: 15px; font-size: 0.85rem; color: #999; letter-spacing: 1px;">
+    POPULAR BRANDS
+  </div>
+  <div class="brand-list" id="brand-list-container"></div>
+  <div style="height: 50px"></div>
+</div>
       </div>
     </div>
 
@@ -1584,7 +1534,7 @@
 
           // Show Strikethrough if discount > 0
           if (discountPercent > 0) {
-            originalEl.textContent = "~~$" + subtotal.toFixed(0) + "~~";
+            originalEl.textContent = "$" + subtotal.toFixed(0);
             originalEl.style.display = "inline-block";
           } else {
             originalEl.style.display = "none";
@@ -2287,13 +2237,14 @@
           }),
         );
       }
+
+      function goToPerfumeSite() {
+        if (typeof PERFUME_SITE_URL !== 'undefined' && PERFUME_SITE_URL) {
+          window.open(PERFUME_SITE_URL, '_blank');
+        } else {
+          alert("跳转网址未设置！");
+        }
+      }
     </script>
-function goToPerfumeSite() {
-  if (typeof PERFUME_SITE_URL !== 'undefined' && PERFUME_SITE_URL) {
-    window.open(PERFUME_SITE_URL, '_blank');
-  } else {
-    alert("跳转网址未设置！");
-  }
-}
   </body>
 </html>
