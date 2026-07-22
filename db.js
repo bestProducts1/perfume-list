@@ -34,7 +34,7 @@ function clearCart() {
 
 // 🔴 注意：已将 pubhtml 修正为 pub?output=csv
 const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRu7b5PXTT7XKOyfWf8zyQIE-uP0W6ZmuQh7e6BdsqQ-igpoLC_IMd-RWk6KBHFR0jJgic--5av7zGc/pub?output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS_1tyfxYn_N6GiapL-T1u325G_A5L7YlrgAZKd92Nnl_7l12c5hDeur-9kwuE4RfBY4a9lZzNnqzc9/pub?gid=0&single=true&output=csv;
 
 const CACHE_DURATION = 1 * 60 * 1000; // 缓存时间 (1分钟)
 window.perfumeDB = [];
