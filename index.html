@@ -1037,7 +1037,7 @@
             "
             >🚚 Track My Order</a
           >
-          <a class="menu-link" href="https://wa.me/17253041220" target="_blank"
+          <a class="menu-link" href="https://wa.me/16232027321" target="_blank"
             >Contact Us</a
           >
         </nav>
@@ -1115,7 +1115,7 @@
             See Policy
           </button>
         </div>
-        <a href="https://wa.me/17253041220" target="_blank" class="trust-item">
+        <a href="https://wa.me/16232027321" target="_blank" class="trust-item">
           <div style="font-size: 2rem; color: #2ecc71; margin-bottom: 10px">
             💬
           </div>
@@ -1357,7 +1357,8 @@
 
             if (data.status === "success") {
               // 处理多单号：按换行符或空格分割
-              let rawTracks = data.tracking ? String(data.tracking).trim().split(/[\n\s]+/) : [];
+              let rawTracks = String(data.tracking).split(/[\n\s]+/);
+
               // 生成每一个单号的 HTML
               let trackHtml = rawTracks
                 .map((num) => {
@@ -1575,7 +1576,7 @@
 
           // Show Strikethrough if discount > 0
           if (discountPercent > 0) {
-           originalEl.textContent = "$" + subtotal.toFixed(0);
+            originalEl.textContent = "~~$" + subtotal.toFixed(0) + "~~";
             originalEl.style.display = "inline-block";
           } else {
             originalEl.style.display = "none";
@@ -1645,92 +1646,194 @@
         }
       }
 
-// --- Home Render Logic ---
+      // --- Home Render Logic ---
       function renderHome() {
         const db = (window.perfumeDB || []).filter(
-          (p) => (parseInt(p.stock) || 0) > 0 || (parseInt(p.stock2) || 0) > 0
+          (p) => parseInt(p.stock) > 0,
         );
-
         const container = document.getElementById("home-content");
         if (!container) return;
         container.innerHTML = "";
 
-        // 1. Best Sellers (按 top 数字排序)
+        const renderSection = (title, items, filterKey) => {
+          const section = createBrandSection(title, items, filterKey);
+          if (
+            filterKey &&
+            !["BestSellers", "New", "Sale"].includes(filterKey)
+          ) {
+            section.id = "brand-" + filterKey.replace(/\s+/g, "");
+          }
+          container.appendChild(section);
+        };
+
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const bestSellers = db
           .filter((p) => Number(p.top) > 0)
           .sort((a, b) => Number(a.top) - Number(b.top));
-        if (bestSellers.length > 0) {
-          const sec = createBrandSection("🔥 Best Sellers", bestSellers, "BestSellers");
-          sec.id = "brand-BestSellers";
-          container.appendChild(sec);
-        }
+        if (bestSellers.length > 0)
+          renderSection("🔥 Best Sellers", bestSellers, "BestSellers");
 
-        // 2. New Arrivals (按 new 数字排序)
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const newArrivals = db
           .filter((p) => Number(p.new) > 0)
           .sort((a, b) => Number(a.new) - Number(b.new));
-        if (newArrivals.length > 0) {
-          const sec = createBrandSection("🆕 New Arrivals", newArrivals, "New");
-          sec.id = "brand-New";
-          container.appendChild(sec);
-        }
+        if (newArrivals.length > 0)
+          renderSection("🆕 New Arrivals", newArrivals, "New");
 
-        // 3. Popular Brands
         const renderedBrands = new Set();
-        if (typeof FEATURED_BRANDS !== "undefined" && Array.isArray(FEATURED_BRANDS)) {
-          FEATURED_BRANDS.forEach((brand) => {
-            const products = db.filter(
-              (p) => p.brand && p.brand.toLowerCase().includes(brand.toLowerCase())
-            );
-            if (products.length >= 3) {
-              let displayName = brand === "Yves Saint Laurent" ? "YSL" : brand.toUpperCase();
-              const sec = createBrandSection(displayName, products, brand);
-              sec.id = "brand-" + brand.replace(/\s+/g, "");
-              container.appendChild(sec);
-              renderedBrands.add(brand);
-            }
-          });
-        }
+        FEATURED_BRANDS.forEach((brand) => {
+          const products = db.filter((p) =>
+            p.brand.toLowerCase().includes(brand.toLowerCase()),
+          );
+          if (products.length >= 3) {
+            let displayName =
+              brand === "Yves Saint Laurent" ? "YSL" : brand.toUpperCase();
+            renderSection(displayName, products, brand);
+            renderedBrands.add(brand);
+          }
+        });
 
-        // 4. Other Brands
         const otherProducts = db.filter((p) => {
-          if (!p.brand) return true;
           for (let featured of renderedBrands) {
-            if (p.brand.toLowerCase().includes(featured.toLowerCase())) return false;
+            if (p.brand.toLowerCase().includes(featured.toLowerCase()))
+              return false;
           }
           return true;
         });
 
         if (otherProducts.length > 0) {
-          const otherSection = createBrandSection("Other Brands", otherProducts, "Other");
+          const otherSection = createBrandSection(
+            "Other Brands",
+            otherProducts,
+            "Other",
+          );
           otherSection.id = "brand-Other";
           container.appendChild(otherSection);
         }
 
-        // 5. On Sale (按 sale 数字排序)
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const saleItems = db
           .filter((p) => Number(p.sale) > 0)
           .sort((a, b) => Number(a.sale) - Number(b.sale));
-        if (saleItems.length > 0) {
-          const sec = createBrandSection("🏷️ On Sale", saleItems, "Sale");
-          sec.id = "brand-Sale";
-          container.appendChild(sec);
-        }
+        if (saleItems.length > 0)
+          renderSection("🏷️ On Sale", saleItems, "Sale");
 
-        // 6. Gift Sets
-        const setItems = db.filter((p) => p.name && p.name.toUpperCase().includes("SET"));
-        if (setItems.length > 0) {
-          const sec = createBrandSection("🎁 Gift Sets", setItems, "Set");
-          sec.id = "brand-Set";
-          container.appendChild(sec);
-        }
+        const setItems = db.filter((p) => p.name.toUpperCase().includes("SET"));
+        if (setItems.length > 0) renderSection("🎁 Gift Sets", setItems, "Set");
 
-        // 7. 底部 Shop All 按钮
         const shopAllContainer = document.createElement("div");
         shopAllContainer.className = "shop-all-section";
         shopAllContainer.innerHTML = `<button class="shop-all-btn" onclick="handleMenuClick('All')">Shop All Products</button>`;
         container.appendChild(shopAllContainer);
       }
+
+      function createBrandSection(title, products, filterKey) {
+        const section = document.createElement("div");
+        section.className = "brand-section";
+        const cleanFilterKey =
+          filterKey || (title.includes("Best") ? "BestSellers" : "All");
+
+        const header = document.createElement("div");
+        header.className = "brand-header";
+        header.innerHTML = `<h2 class="brand-title">${title}</h2><div class="brand-see-all" onclick="switchToGrid('${cleanFilterKey}')">See All ></div>`;
+        section.appendChild(header);
+
+        const wrapperContainer = document.createElement("div");
+        wrapperContainer.className = "scroll-container-wrapper";
+        const leftBtn = document.createElement("div");
+        leftBtn.className = "scroll-arrow-btn left";
+        leftBtn.innerHTML = "&#10094;";
+        const rightBtn = document.createElement("div");
+        rightBtn.className = "scroll-arrow-btn right";
+        rightBtn.innerHTML = "&#10095;";
+        const wrapper = document.createElement("div");
+        wrapper.className = "scroll-wrapper";
+
+        products.slice(0, 15).forEach((p) => {
+          const card = document.createElement("div");
+          card.className = "scroll-card";
+          card.onclick = (e) => {
+            if (
+              e.target.closest(".action-btn-black") ||
+              e.target.closest(".action-qty-box")
+            )
+              return;
+            openModal(p);
+          };
+
+          let badgesHtml = "";
+          if (p.top == 1)
+            badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
+          if (p.new == 1)
+            badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
+          if (p.sale == 1)
+            badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
+
+          const imgHtml = generatePictureHTML(p.img, p.name);
+          const genderClass = getGenderClass(p.gender);
+          const genderHtml = p.gender
+            ? `<span class="gender-tag ${genderClass}">${p.gender}</span>`
+            : "";
+          const stockHtml = getStockHtml(p.inventory);
+
+          // Use NEW button logic
+          const buttonHtml = getAddButtonHtml(p.id);
+
+          // 核心修改 2：给按钮包裹层统一增加 data-btn-wrap 属性，方便批量更新
+          card.innerHTML = `
+            <div style="position:relative;">${imgHtml}<div class="badges-container">${badgesHtml}</div></div>
+            <div style="padding: 0 5px 5px 5px; display:flex; flex-direction:column; flex:1;">
+                <div class="scroll-card-title">${p.id}-${p.name}</div>
+                <div style="display:flex; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+                    <span style="font-size:0.75rem; color:#666; font-weight:600;">${p.brand}</span>
+                    ${genderHtml}
+                </div>
+                <div class="scroll-card-price">
+                    $${p.price} ${stockHtml}
+                    <span style="font-size:0.75rem; color:#666; font-weight:normal; margin-left:5px;">${p.ml ? formatSize(p) : ""}</span>
+                </div>
+                <div class="btn-qty-wrapper" data-btn-wrap="${p.id}">${buttonHtml}</div>
+            </div>
+          `;
+          wrapper.appendChild(card);
+        });
+
+        const progressContainer = document.createElement("div");
+        progressContainer.className = "scroll-progress-container";
+        const progressBar = document.createElement("div");
+        progressBar.className = "scroll-progress-bar";
+        progressContainer.appendChild(progressBar);
+
+        wrapperContainer.appendChild(leftBtn);
+        wrapperContainer.appendChild(wrapper);
+        wrapperContainer.appendChild(rightBtn);
+        section.appendChild(wrapperContainer);
+        section.appendChild(progressContainer);
+
+        const updateControls = () => {
+          const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+          const scrollLeft = wrapper.scrollLeft;
+          leftBtn.classList.toggle("visible", scrollLeft > 10);
+          rightBtn.classList.toggle("visible", scrollLeft < maxScroll - 10);
+          if (maxScroll > 0) {
+            const percentage = (scrollLeft / maxScroll) * 100;
+            progressBar.style.width = Math.max(10, percentage) + "%";
+          } else {
+            progressBar.style.width = "100%";
+          }
+        };
+
+        leftBtn.onclick = () =>
+          wrapper.scrollBy({ left: -200, behavior: "smooth" });
+        rightBtn.onclick = () =>
+          wrapper.scrollBy({ left: 200, behavior: "smooth" });
+        wrapper.addEventListener("scroll", updateControls);
+        setTimeout(updateControls, 100);
+
+        return section;
+      }
+
+      // --- Brand & Search Logic ---
       const BRAND_ALIASES = {
         lv: "Louis Vuitton",
         "louis vuitton": "Louis Vuitton",
