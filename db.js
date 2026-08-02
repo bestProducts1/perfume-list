@@ -1,8 +1,7 @@
 // ==========================================
-// db.js - 产品数据管理中心
+// db.js - 产品数据管理中心（完整无错版）
 // ==========================================
 
-// 🔴 请确保这个链接是您“发布到网络”后生成的 CSV 链接
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vS_1tyfxYn_N6GiapL-T1u325G_A5L7YlrgAZKd92Nnl_7l12c5hDeur-9kwuE4RfBY4a9lZzNnqzc9/pub?gid=0&single=true&output=csv";
 
@@ -16,8 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function initProductData() {
-  // ⚡️ [重要修改] 更新版本号 V4 -> V5
-  // 这会强制浏览器忽略旧缓存，确保加载包含 Inventory 的新数据
   const cacheKey = "perfumeDB_Data_V5";
   const timeKey = "perfumeDB_Time_V5";
 
@@ -52,7 +49,6 @@ async function initProductData() {
     runPageLogic();
   } catch (error) {
     console.error("下载失败:", error);
-    // 如果下载失败但有旧缓存（即使是旧版本的），作为备用加载
     if (cachedData) {
       window.perfumeDB = JSON.parse(cachedData);
       runPageLogic();
@@ -62,7 +58,6 @@ async function initProductData() {
 }
 
 function runPageLogic() {
-  // 确保首页和购物车逻辑存在才执行
   if (typeof renderHome === "function") renderHome();
   if (typeof renderCart === "function") renderCart();
 }
@@ -71,8 +66,6 @@ function parseCSV(csvText) {
   const lines = csvText.trim().split("\n");
   if (lines.length < 2) return [];
 
-  // 🔹 注意：这里会将所有表头转为小写 (toLowerCase)
-  // 所以表格里的 "Notes" -> "notes", "Inventory" -> "inventory"
   const headers = lines[0]
     .trim()
     .split(",")
@@ -81,7 +74,6 @@ function parseCSV(csvText) {
   return lines
     .slice(1)
     .map((line) => {
-      // 处理 CSV 中的逗号和引号
       const values = [];
       let current = "";
       let inQuote = false;
@@ -98,25 +90,18 @@ function parseCSV(csvText) {
       values.push(current.trim());
 
       const obj = {};
-      // 如果列数不匹配，跳过
       if (values.length < headers.length) return null;
 
       headers.forEach((header, index) => {
         let val = values[index] ? values[index].replace(/^"|"$/g, "") : "";
-
-        // 🔴 [关键修改] 这里把 inventory 也强制转为数字类型
-        // 这样在 index.html 里才能进行数学比较 (inventory < 50)
-        if (
-          header === "price" ||
-          header === "stock" ||
-          header === "inventory"
-        ) {
-          val = Number(val);
+        if (["inventory", "price", "top", "new", "sale", "stock", "stock2"].includes(header)) {
+          obj[header] = isNaN(Number(val)) ? val : Number(val);
+        } else {
+          obj[header] = val;
         }
-
-        obj[header] = val;
       });
+
       return obj;
     })
-    .filter((item) => item !== null);
+    .filter(Boolean);
 }
