@@ -36,6 +36,7 @@
         margin: 0;
         padding: 0;
         padding-top: var(--total-top-spacing);
+        /* 底部留出更多空间，防止内容被悬浮胶囊遮挡 */
         padding-bottom: 110px;
         font-family: var(--font-main);
         background: var(--bg-color);
@@ -51,7 +52,7 @@
       }
       button {
         outline: none;
-        font-family: inherit;
+        font-family: inherit; /* 关键：强制继承父级字体 */
         border: none;
         background: none;
         padding: 0;
@@ -116,6 +117,24 @@
         background: #fff;
         color: #000;
         border-color: #fff;
+      }
+
+      /* 右上角 Tracking 模块样式 */
+      .header-right {
+        position: relative;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        padding-right: 5px;
+        gap: 6px;
+      }
+      .track-text {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: #fff;
       }
 
       /* ================= 3. Sidebar ================= */
@@ -215,15 +234,18 @@
         padding: 10px 5px;
         text-align: center;
         transition: background 0.3s;
+
         position: sticky;
         top: var(--header-height);
         z-index: 990;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
       }
+
       .ws-banner.active-tier {
         background: linear-gradient(135deg, #111 0%, #2a2a2a 100%);
         border-bottom: 3px solid #ffd700;
       }
+
       .ws-progress-box {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 4px;
@@ -242,6 +264,7 @@
         font-weight: bold;
         font-size: 1rem;
       }
+
       .ws-pills {
         display: flex;
         justify-content: center;
@@ -261,48 +284,55 @@
         margin-left: 3px;
       }
 
-      /* ================= Floating Capsule Bottom Bar ================= */
+      /* ================= NEW Floating Capsule Bottom Bar (Split Pill Design) ================= */
       .bottom-nav-bar {
         position: fixed;
-        bottom: 25px;
+        bottom: 25px; /* 悬浮 */
         left: 50%;
         transform: translateX(-50%);
         width: 92%;
         max-width: 500px;
         height: 70px;
         background: #ffffff;
+        /* 核心修改：Z-index 降低到 980，低于 Header(1000)、Sidebar(2001) 和 Modal(2000) */
         z-index: 980;
         display: flex;
-        align-items: stretch;
+        align-items: stretch; /* 撑满高度 */
         justify-content: space-between;
         padding: 0;
-        border-radius: 50px;
+        border-radius: 50px; /* 胶囊外形 */
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         border: 1px solid rgba(0, 0, 0, 0.03);
-        overflow: hidden;
+        overflow: hidden; /* 裁切内部 */
       }
+
+      /* Left Side: Asset Area (45%) */
       .nav-left {
         width: 45%;
         display: flex;
         align-items: center;
         cursor: pointer;
-        padding-left: 12px;
+        padding-left: 12px; /* 减少留白，让图标靠左 */
         gap: 8px;
         background: #fff;
       }
+
       .nav-icon-wrap {
         position: relative;
         display: flex;
         align-items: center;
         flex-shrink: 0;
       }
+
       .nav-cart-icon {
-        width: 34px;
+        width: 34px; /* 大图标 */
         height: 34px;
         stroke: #333;
         fill: none;
         stroke-width: 1.8;
       }
+
+      /* 角标 */
       .nav-badge {
         position: absolute;
         top: -6px;
@@ -321,12 +351,14 @@
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         z-index: 10;
       }
+
       .nav-info-col {
         display: flex;
         flex-direction: column;
         justify-content: center;
         overflow: hidden;
       }
+
       .price-info-row {
         display: flex;
         align-items: baseline;
@@ -334,12 +366,14 @@
         line-height: 1;
         white-space: nowrap;
       }
+
       .nav-price {
         font-size: 1.3rem;
         font-weight: 800;
         color: #000;
         letter-spacing: -0.5px;
       }
+
       .nav-original-price {
         font-size: 0.9rem;
         color: #555;
@@ -347,14 +381,17 @@
         font-weight: 600;
         opacity: 0.7;
       }
+
+      /* Right Side: Action Button (55%) */
       .nav-right {
         width: 55%;
         height: 100%;
       }
+
       .checkout-pill-btn {
         width: 100%;
         height: 100%;
-        background-color: #25d366;
+        background-color: #25d366; /* WhatsApp Green */
         color: #fff;
         border: none;
         border-radius: 0;
@@ -364,7 +401,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 8px; /* 图标文字间距加大 */
         cursor: pointer;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -374,7 +411,7 @@
         background-color: #1ebc57;
       }
 
-      /* ================= BUTTON STYLES ================= */
+      /* ================= BUTTON STYLES (Cards) ================= */
       .action-btn-black {
         background: #000;
         color: #fff;
@@ -389,6 +426,7 @@
         border: none;
         text-transform: uppercase;
       }
+
       .action-qty-box {
         display: flex;
         align-items: center;
@@ -421,6 +459,7 @@
         text-align: center;
         font-family: inherit;
       }
+
       .btn-qty-wrapper {
         width: 100%;
         margin-top: 8px;
@@ -429,12 +468,21 @@
 
       /* ================= Skeleton & Lazy Load ================= */
       @keyframes skeleton-loading {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
       }
       .skeleton-loader {
         background: #f0f0f0;
-        background-image: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-image: linear-gradient(
+          90deg,
+          #f0f0f0 25%,
+          #e0e0e0 50%,
+          #f0f0f0 75%
+        );
         background-size: 200% 100%;
         animation: skeleton-loading 1.5s infinite;
       }
@@ -491,6 +539,7 @@
         padding: 5px 12px 15px 12px;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
         scroll-behavior: smooth;
       }
       .scroll-wrapper::-webkit-scrollbar {
@@ -512,7 +561,9 @@
         cursor: pointer;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.3s, transform 0.2s;
+        transition:
+          opacity 0.3s,
+          transform 0.2s;
         font-size: 1rem;
         color: #333;
         border: 1px solid #eee;
@@ -521,8 +572,12 @@
         opacity: 1;
         pointer-events: auto;
       }
-      .scroll-arrow-btn.left { left: 2px; }
-      .scroll-arrow-btn.right { right: 2px; }
+      .scroll-arrow-btn.left {
+        left: 2px;
+      }
+      .scroll-arrow-btn.right {
+        right: 2px;
+      }
       .scroll-progress-container {
         width: 60px;
         height: 4px;
@@ -581,9 +636,15 @@
         box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
         text-transform: uppercase;
       }
-      .badge-hot { background: var(--tag-hot); }
-      .badge-new { background: var(--tag-new); }
-      .badge-sale { background: var(--tag-sale); }
+      .badge-hot {
+        background: var(--tag-hot);
+      }
+      .badge-new {
+        background: var(--tag-new);
+      }
+      .badge-sale {
+        background: var(--tag-sale);
+      }
       .scroll-card-title {
         font-size: 0.85rem;
         color: #333;
@@ -646,7 +707,10 @@
         align-items: center;
         margin-bottom: 20px;
       }
-      .gallery-title { font-size: 1.3rem; font-weight: 700; }
+      .gallery-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
       .back-home-btn {
         font-size: 0.9rem;
         text-decoration: underline;
@@ -683,7 +747,10 @@
         object-fit: cover;
         cursor: pointer;
       }
-      .item .caption { padding: 10px 8px; text-align: left; }
+      .item .caption {
+        padding: 10px 8px;
+        text-align: left;
+      }
       .item-price {
         font-weight: bold;
         color: var(--accent-color);
@@ -714,7 +781,9 @@
         border: 1px solid transparent;
         font-family: inherit;
       }
-      .page-btn:hover { background-color: #444; }
+      .page-btn:hover {
+        background-color: #444;
+      }
       .page-btn.active {
         background-color: var(--accent-color);
         color: #000;
@@ -749,8 +818,16 @@
         display: block;
         background: #fff;
       }
-      .trust-item h4 { margin: 10px 0 5px; font-size: 1.1rem; }
-      .trust-item p { font-size: 0.9rem; color: #666; margin: 0; line-height: 1.4; }
+      .trust-item h4 {
+        margin: 10px 0 5px;
+        font-size: 1.1rem;
+      }
+      .trust-item p {
+        font-size: 0.9rem;
+        color: #666;
+        margin: 0;
+        line-height: 1.4;
+      }
       .modal {
         display: none;
         position: fixed;
@@ -761,7 +838,9 @@
         justify-content: center;
         padding: 15px;
       }
-      .modal.open { display: flex; }
+      .modal.open {
+        display: flex;
+      }
       .modal-content {
         background: #fff;
         width: 100%;
@@ -792,7 +871,33 @@
         object-fit: cover;
         background: #f8f8f8;
       }
-      .modal-info { padding: 8px 15px; }
+      .modal-info {
+        padding: 8px 15px;
+      }
+      .modal-notes-box {
+        background-color: #f7f7f7;
+        border-radius: 8px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        text-align: left;
+        border: 1px solid #eee;
+      }
+      .modal-notes-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 2px;
+        display: block;
+      }
+      .modal-notes-text {
+        font-size: 0.85rem;
+        color: #444;
+        line-height: 1.3;
+        font-family: Georgia, serif;
+        font-style: italic;
+      }
       .gender-tag {
         display: inline-block;
         font-size: 0.7rem;
@@ -803,9 +908,21 @@
         font-weight: 600;
         letter-spacing: 0.5px;
       }
-      .gender-tag.women { color: #c2185b; background: #fce4ec; border: 1px solid #f8bbd0; }
-      .gender-tag.men { color: #1565c0; background: #e3f2fd; border: 1px solid #bbdefb; }
-      .gender-tag.unisex { color: #455a64; background: #eceff1; border: 1px solid #cfd8dc; }
+      .gender-tag.women {
+        color: #c2185b;
+        background: #fce4ec;
+        border: 1px solid #f8bbd0;
+      }
+      .gender-tag.men {
+        color: #1565c0;
+        background: #e3f2fd;
+        border: 1px solid #bbdefb;
+      }
+      .gender-tag.unisex {
+        color: #455a64;
+        background: #eceff1;
+        border: 1px solid #cfd8dc;
+      }
 
       /* Toast Message */
       #toast {
@@ -847,6 +964,25 @@
           class="header-search-input"
           placeholder="Search..."
         />
+      </div>
+      <div class="header-right" onclick="openTrackingModal()">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="white"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </svg>
+        <span class="track-text">TRACK</span>
       </div>
     </header>
 
@@ -890,6 +1026,17 @@
             >New Arrivals 🆕</a
           >
           <a class="menu-link" href="cart.html">My Cart</a>
+          <a
+            class="menu-link"
+            onclick="openTrackingModal()"
+            style="
+              color: #000;
+              border-top: 1px solid #eee;
+              margin-top: 10px;
+              padding-top: 20px;
+            "
+            >🚚 Track My Order</a
+          >
           <a class="menu-link" href="https://wa.me/16232027321" target="_blank"
             >Contact Us</a
           >
@@ -917,7 +1064,8 @@
       </div>
 
       <div id="home-content">
-        <div class="loading-container" style="text-align:center; padding: 40px;">
+        <div class="loading-container">
+          <div class="spinner"></div>
           <div class="loading-text">LOADING...</div>
         </div>
       </div>
@@ -1035,7 +1183,7 @@
             viewBox="0 0 16 16"
           >
             <path
-              d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.06 3.973L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"
+              d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.06 3.973L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"
             />
           </svg>
           CHECKOUT
@@ -1053,7 +1201,7 @@
         >
           &times;
         </div>
-        <img id="modal-img" class="modal-img" src="" alt="Product" />
+        <img id="modal-img" class="modal-img" src="" />
         <div class="modal-info">
           <h3
             id="modal-title"
@@ -1105,8 +1253,177 @@
       </div>
     </div>
 
+    <div id="tracking-modal" class="modal">
+      <div
+        class="modal-content"
+        style="max-width: 360px; text-align: center; padding: 25px"
+      >
+        <div class="modal-close" onclick="closeTrackingModal()">&times;</div>
+
+        <h3 style="margin: 0 0 10px 0; font-size: 1.2rem">TRACK YOUR ORDER</h3>
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px">
+          Enter your <b>Phone Number</b> or <b>Name</b> to retrieve your
+          tracking info.
+        </p>
+
+        <input
+          type="text"
+          id="track-input"
+          class="header-search-input"
+          style="
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+          "
+          placeholder="e.g. 1234567890 or Jackson"
+        />
+
+        <button
+          id="track-btn"
+          class="action-btn-black"
+          onclick="performTracking()"
+        >
+          CHECK NOW
+        </button>
+
+        <div
+          id="track-result"
+          style="
+            margin-top: 20px;
+            display: none;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+          "
+        ></div>
+      </div>
+    </div>
+
     <script src="db.js"></script>
     <script>
+      // ================= Tracking & Checkout Logic =================
+      const GOOGLE_SCRIPT_URL =
+        "https://script.google.com/macros/s/AKfycbyTu1LHtseu7j_v40r9Sp2ZbqLZ3ZrlWexqVUjjQhouK6zZPxnBLwaCL9LAbawLIFI/exec";
+
+      function openTrackingModal() {
+        document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-overlay").classList.remove("active");
+        document.getElementById("tracking-modal").classList.add("open");
+      }
+
+      function closeTrackingModal() {
+        document.getElementById("tracking-modal").classList.remove("open");
+        document.getElementById("track-result").style.display = "none";
+        document.getElementById("track-input").value = "";
+      }
+
+      // 辅助函数：根据快递公司生成查询链接
+      function getTrackingUrl(carrier, num) {
+        if (!carrier) return "https://t.17track.net/en#nums=" + num;
+        let c = carrier.toLowerCase();
+        if (c.includes("ups"))
+          return `https://www.ups.com/track?tracknum=${num}`;
+        if (c.includes("usps"))
+          return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${num}`;
+        if (c.includes("fedex"))
+          return `https://www.fedex.com/fedextrack/?trknbr=${num}`;
+        // GOFO Express 或其他未识别的，全部走 17TRACK
+        return `https://t.17track.net/en#nums=${num}`;
+      }
+
+      function performTracking() {
+        const input = document.getElementById("track-input").value.trim();
+        const btn = document.getElementById("track-btn");
+        const resultDiv = document.getElementById("track-result");
+
+        if (!input) return alert("Please enter a name or phone number.");
+
+        // UI Loading State
+        btn.textContent = "SEARCHING...";
+        btn.disabled = true;
+        resultDiv.style.display = "none";
+
+        // 发起请求
+        fetch(`${GOOGLE_SCRIPT_URL}?q=${encodeURIComponent(input)}`)
+          .then((response) => response.json())
+          .then((data) => {
+            btn.textContent = "CHECK NOW";
+            btn.disabled = false;
+            resultDiv.style.display = "block";
+
+            if (data.status === "success") {
+              // 处理多单号：按换行符或空格分割
+              let rawTracks = String(data.tracking).split(/[\n\s]+/);
+
+              // 生成每一个单号的 HTML
+              let trackHtml = rawTracks
+                .map((num) => {
+                  if (num.length < 5) return ""; // 过滤无效短字符
+
+                  // 获取跳转链接
+                  let trackLink = getTrackingUrl(data.carrier, num);
+
+                  // 核心修改 1：移除 alert，改为触发无弹窗的 Toast 提示
+                  return `
+                    <div style="background:#fff; border:1px dashed #ccc; border-radius:4px; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                           <span style="font-family:monospace; font-weight:bold; font-size:0.95rem; word-break:break-all;">${num}</span>
+                           <a href="${trackLink}" target="_blank" style="font-size:0.75rem; color:#007bff; text-decoration:none; font-weight:bold; display:flex; align-items:center; gap:3px;">
+                              🌐 TRACK
+                           </a>
+                        </div>
+                        <span onclick="navigator.clipboard.writeText('${num}').then(()=>showToast('Tracking Number Copied!'))" style="cursor:pointer; font-size:1.2rem; padding:5px;" title="Copy">📋</span>
+                    </div>
+                  `;
+                })
+                .join("");
+
+              // 渲染结果
+              resultDiv.innerHTML = `
+                <div style="color:#28a745; font-weight:bold; margin-bottom:5px; font-size:1.1rem;">✅ Order Found!</div>
+                
+                <div style="background:#eee; height:1px; margin:10px 0;"></div>
+                
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#555; margin-bottom:10px;">
+                    <span>📅 Date: <b>${data.order_date || "N/A"}</b></span>
+                    <span>👤 <b>${data.customer_name}</b></span>
+                </div>
+
+                <div style="font-size:0.9rem; color:#333; margin-bottom:8px;">
+                    Carrier: <b>${data.carrier}</b>
+                </div>
+
+                <div style="text-align:left;">
+                    ${trackHtml}
+                </div>
+                
+                <div style="font-size:0.75rem; color:#999; margin-top:5px; text-align:center;">
+                    *Click icon to copy number
+                </div>
+              `;
+            } else {
+              // 没找到
+              resultDiv.innerHTML = `
+                <div style="color:#d9534f; font-weight:bold;">❌ Order Not Found</div>
+                <p style="font-size:0.85rem; color:#666; margin-top:5px;">
+                  We couldn't find an order with that info. Please try your <b>Phone Number (digits only)</b> or check if the order has been shipped yet.
+                </p>
+              `;
+            }
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            btn.textContent = "CHECK NOW";
+            btn.disabled = false;
+            alert("System Error. Please try again later.");
+          });
+      }
+
+      // ... (Rest of existing JS functions: loadCart, saveCart, updateWholesaleBanner, etc.)
       const FEATURED_BRANDS = [
         "Creed",
         "Dior",
@@ -1128,38 +1445,7 @@
         "Burberry",
         "Versace",
       ];
-
-      const brandShortNames = {
-        "Dior": "DIO",
-        "Chanel": "CHA",
-        "Louis Vuitton": "LV",
-        "Tom Ford": "TF",
-        "Creed": "CRD",
-        "Yves Saint Laurent": "YSL",
-        "Valentino": "VAL",
-        "Versace": "VER",
-        "Jean Paul Gaultier": "JPG",
-        "Parfums de Marly": "PDM",
-        "Giorgio Armani": "ARM",
-        "Maison Francis Kurkdjian": "MFK",
-        "Gucci": "GUC",
-        "Lattafa": "LAT",
-        "Azzaro": "AZZ",
-        "Carolina Herrera": "CAR",
-        "Paco Rabanne": "PR",
-        "Initio": "INI",
-        "Xerjoff": "XER",
-        "Kayali": "KAY",
-        "Amouage": "AMO",
-        "Burberry": "BUR",
-        "Prada": "PRA",
-        "Ralph Lauren": "RL",
-        "BVLGARI": "BVL",
-        "Givenchy": "GIV",
-        "Kilian": "KIL",
-        "Lancôme": "LAN"
-      };
-
+      const FEATURED_BRANDS_LOWER = FEATURED_BRANDS.map((b) => b.toLowerCase());
       const discountTiers = [
         { min: 1, max: 1, percent: 0 },
         { min: 2, max: 2, percent: 0.03 },
@@ -1195,119 +1481,14 @@
         }, 50);
       });
 
-      window.addEventListener("pageshow", function () {
+      window.addEventListener("pageshow", function (event) {
         loadCart();
         if (viewMode === "home") renderHome();
         else renderGridPage();
       });
 
-      function loadCart() {
-        cartItems = JSON.parse(localStorage.getItem("perfumeCart") || "[]");
-        updateWholesaleBanner();
-      }
-
-      function saveCart() {
-        localStorage.setItem("perfumeCart", JSON.stringify(cartItems));
-        updateWholesaleBanner();
-        window.dispatchEvent(new Event("storage"));
-      }
-
-      function updateItemQty(name, delta) {
-        const existingItem = cartItems.find((i) => i.name === name);
-        if (existingItem) {
-          existingItem.quantity += delta;
-          if (existingItem.quantity <= 0) {
-            cartItems = cartItems.filter((i) => i.name !== name);
-          }
-        } else if (delta > 0) {
-          const db = window.perfumeDB || [];
-          const product = db.find((p) => p.name === name);
-          if (product) {
-            cartItems.push({
-              name: product.name,
-              price: Number(product.price),
-              img: product.img,
-              brand: product.brand,
-              quantity: 1
-            });
-          }
-        }
-        saveCart();
-        showToast("Cart updated!");
-
-        if (viewMode === "home") {
-          renderHome();
-        } else {
-          renderGridPage();
-        }
-
-        if (currentModalProductId === name) {
-          const db = window.perfumeDB || [];
-          const product = db.find((p) => p.name === name);
-          if (product) {
-            document.getElementById("modal-action-area").innerHTML = `
-              <div style="margin-top: 10px;">
-                ${getAddButtonHtml(product.name)}
-              </div>
-            `;
-          }
-        }
-      }
-
       function getCartTotalQty() {
         return cartItems.reduce((s, i) => s + i.quantity, 0);
-      }
-
-      function getCartQty(name) {
-        const item = cartItems.find((c) => c.name === name);
-        return item ? item.quantity : 0;
-      }
-
-      function setupSearch() {
-        const input = document.getElementById("global-search-input");
-        if (!input) return;
-        input.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            const query = input.value.trim().toLowerCase();
-            if (query) {
-              const db = (window.perfumeDB || []).filter(
-                (p) => parseInt(p.stock) > 0 || parseInt(p.stock2) > 0
-              );
-
-              currentGridData = db.filter((p) => {
-                const nameMatch = p.name.toLowerCase().includes(query);
-                const brandMatch = p.brand.toLowerCase().includes(query);
-                const idMatch = p.id && p.id.toLowerCase().includes(query);
-                
-                let shortNameMatch = false;
-                for (const [brandName, shortName] of Object.entries(brandShortNames)) {
-                  if (shortName.toLowerCase() === query && p.brand.toLowerCase().includes(brandName.toLowerCase())) {
-                    shortNameMatch = true;
-                    break;
-                  }
-                }
-                return nameMatch || brandMatch || idMatch || shortNameMatch;
-              });
-
-              viewMode = "grid";
-              currentPage = 1;
-              document.getElementById("home-view").style.display = "none";
-              document.getElementById("grid-view").style.display = "block";
-              document.getElementById("grid-title").textContent = `Search: "${query}"`;
-              renderGridPage();
-              input.blur();
-            }
-          }
-        });
-      }
-
-      function showToast(msg) {
-        const toast = document.getElementById("toast");
-        toast.textContent = msg;
-        toast.className = "show";
-        setTimeout(() => {
-          toast.className = toast.className.replace("show", "");
-        }, 2000);
       }
 
       function getStockHtml(inventory) {
@@ -1322,6 +1503,7 @@
         const banner = document.getElementById("wholesale-banner");
         const content = document.getElementById("ws-content");
 
+        // 1. Update Top Banner
         if (banner && content) {
           if (qty === 0) {
             banner.className = "ws-banner";
@@ -1338,6 +1520,8 @@
 
             let html = `<div class="ws-progress-box">`;
             let currentOff = Math.round(currentTier.percent * 100);
+            // "Free Shipping" removed from top
+
             html += `<div class="ws-progress-text">Cart: <strong>${qty}</strong> items • Current: <span class="ws-highlight">-${currentOff}% OFF</span></div>`;
             if (nextTier) {
               let needMore = nextTier.min - qty;
@@ -1351,10 +1535,13 @@
             banner.classList.add("active-tier");
           }
         }
+
+        // 2. Update Bottom Bar Data
         updateBottomBarData(qty);
       }
 
       function updateBottomBarData(totalQty) {
+        // Update Badge
         const badgeEl = document.getElementById("bottom-bar-badge");
         if (totalQty > 0) {
           badgeEl.textContent = totalQty;
@@ -1363,6 +1550,7 @@
           badgeEl.style.display = "none";
         }
 
+        // Calculate Total Price with Discount
         let subtotal = 0;
         cartItems.forEach((item) => {
           subtotal += item.price * item.quantity;
@@ -1374,6 +1562,7 @@
         const discountPercent = tier ? tier.percent : 0;
         const finalTotal = subtotal - subtotal * discountPercent;
 
+        // Update Price Text & Strikethrough
         const priceEl = document.getElementById("bottom-bar-price");
         const originalEl = document.getElementById("bottom-bar-original");
 
@@ -1383,7 +1572,9 @@
           originalEl.style.display = "none";
         } else {
           priceEl.textContent = "$" + Math.round(finalTotal);
-          priceEl.style.color = "#000";
+          priceEl.style.color = "#000"; // Big Black Price
+
+          // Show Strikethrough if discount > 0
           if (discountPercent > 0) {
             originalEl.textContent = "~~$" + subtotal.toFixed(0) + "~~";
             originalEl.style.display = "inline-block";
@@ -1434,31 +1625,32 @@
         return `<div class="img-wrapper skeleton-loader"><picture><source srcset="${webpSrc}" type="image/webp"><img src="${src}" alt="${alt}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture></div>`;
       }
 
-      function getAddButtonHtml(name) {
-        const qty = getCartQty(name);
-        const safeName = name.replace(/'/g, "\\'");
-        
+      function getCartQty(id) {
+        const item = cartItems.find((c) => c.name === id);
+        return item ? item.quantity : 0;
+      }
+
+      function getAddButtonHtml(id) {
+        const qty = getCartQty(id);
         if (qty === 0) {
-          return `<button class="action-btn-black" onclick="updateItemQty('${safeName}', 1); event.stopPropagation();">ADD TO CART</button>`;
+          // State 0: Large Black Button
+          return `<button class="action-btn-black" onclick="updateItemQty('${id}', 1); event.stopPropagation();">ADD TO CART</button>`;
         } else {
+          // State >0: Rectangular Control Box
           return `
                 <div class="action-qty-box">
-                    <div class="qty-btn-rect" onclick="updateItemQty('${safeName}', -1); event.stopPropagation();">-</div>
+                    <div class="qty-btn-rect" onclick="updateItemQty('${id}', -1); event.stopPropagation();">-</div>
                     <div class="qty-val-rect">${qty}</div>
-                    <div class="qty-btn-rect" onclick="updateItemQty('${safeName}', 1); event.stopPropagation();">+</div>
+                    <div class="qty-btn-rect" onclick="updateItemQty('${id}', 1); event.stopPropagation();">+</div>
                 </div>`;
         }
       }
 
+      // --- Home Render Logic ---
       function renderHome() {
-        viewMode = "home";
-        document.getElementById("home-view").style.display = "block";
-        document.getElementById("grid-view").style.display = "none";
-
         const db = (window.perfumeDB || []).filter(
-          (p) => parseInt(p.stock) > 0 || parseInt(p.stock2) > 0,
+          (p) => parseInt(p.stock) > 0,
         );
-
         const container = document.getElementById("home-content");
         if (!container) return;
         container.innerHTML = "";
@@ -1467,19 +1659,21 @@
           const section = createBrandSection(title, items, filterKey);
           if (
             filterKey &&
-            !["BestSellers", "New", "Sale", "Set"].includes(filterKey)
+            !["BestSellers", "New", "Sale"].includes(filterKey)
           ) {
             section.id = "brand-" + filterKey.replace(/\s+/g, "");
           }
           container.appendChild(section);
         };
 
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const bestSellers = db
           .filter((p) => Number(p.top) > 0)
           .sort((a, b) => Number(a.top) - Number(b.top));
         if (bestSellers.length > 0)
           renderSection("🔥 Best Sellers", bestSellers, "BestSellers");
 
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const newArrivals = db
           .filter((p) => Number(p.new) > 0)
           .sort((a, b) => Number(a.new) - Number(b.new));
@@ -1517,6 +1711,7 @@
           container.appendChild(otherSection);
         }
 
+        // 【核心修改】：加入基于数字从小到大的精准排序能力
         const saleItems = db
           .filter((p) => Number(p.sale) > 0)
           .sort((a, b) => Number(a.sale) - Number(b.sale));
@@ -1545,301 +1740,544 @@
 
         const wrapperContainer = document.createElement("div");
         wrapperContainer.className = "scroll-container-wrapper";
-
         const leftBtn = document.createElement("div");
         leftBtn.className = "scroll-arrow-btn left";
         leftBtn.innerHTML = "&#10094;";
-
         const rightBtn = document.createElement("div");
         rightBtn.className = "scroll-arrow-btn right";
         rightBtn.innerHTML = "&#10095;";
+        const wrapper = document.createElement("div");
+        wrapper.className = "scroll-wrapper";
 
-        const scrollWrapper = document.createElement("div");
-        scrollWrapper.className = "scroll-wrapper";
-
-        products.forEach((product) => {
+        products.slice(0, 15).forEach((p) => {
           const card = document.createElement("div");
           card.className = "scroll-card";
-          card.onclick = () => openModal(product);
+          card.onclick = (e) => {
+            if (
+              e.target.closest(".action-btn-black") ||
+              e.target.closest(".action-qty-box")
+            )
+              return;
+            openModal(p);
+          };
 
-          const pictureHtml = generatePictureHTML(product.img, product.name);
+          let badgesHtml = "";
+          if (p.top == 1)
+            badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
+          if (p.new == 1)
+            badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
+          if (p.sale == 1)
+            badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
 
-          let badgesHtml = '<div class="badges-container">';
-          if (Number(product.top) > 0)
-            badgesHtml += '<span class="badge-tag badge-hot">HOT</span>';
-          if (Number(product.new) > 0)
-            badgesHtml += '<span class="badge-tag badge-new">NEW</span>';
-          if (Number(product.sale) > 0)
-            badgesHtml += '<span class="badge-tag badge-sale">SALE</span>';
-          badgesHtml += "</div>";
+          const imgHtml = generatePictureHTML(p.img, p.name);
+          const genderClass = getGenderClass(p.gender);
+          const genderHtml = p.gender
+            ? `<span class="gender-tag ${genderClass}">${p.gender}</span>`
+            : "";
+          const stockHtml = getStockHtml(p.inventory);
 
-          const stockHtml = getStockHtml(product.inventory);
-          
-          const genderClass = getGenderClass(product.gender);
-          const genderTag = product.gender ? `<span class="gender-tag ${genderClass}">${product.gender}</span>` : "";
-          const idStr = product.id ? `<span style="font-size:0.75rem; color:#888; font-weight:normal; margin-right:4px;">[${product.id}]</span>` : "";
+          // Use NEW button logic
+          const buttonHtml = getAddButtonHtml(p.id);
 
+          // 核心修改 2：给按钮包裹层统一增加 data-btn-wrap 属性，方便批量更新
           card.innerHTML = `
-            <div style="position:relative;">
-              ${pictureHtml}
-              ${badgesHtml}
-            </div>
-            <div class="scroll-card-title">${idStr}${product.name}</div>
-            <div style="margin-bottom:4px;">${genderTag}</div>
-            <div class="scroll-card-price">$${Number(product.price).toFixed(2)}${stockHtml}</div>
-            <div class="btn-qty-wrapper">
-              ${getAddButtonHtml(product.name)}
+            <div style="position:relative;">${imgHtml}<div class="badges-container">${badgesHtml}</div></div>
+            <div style="padding: 0 5px 5px 5px; display:flex; flex-direction:column; flex:1;">
+                <div class="scroll-card-title">${p.id}-${p.name}</div>
+                <div style="display:flex; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+                    <span style="font-size:0.75rem; color:#666; font-weight:600;">${p.brand}</span>
+                    ${genderHtml}
+                </div>
+                <div class="scroll-card-price">
+                    $${p.price} ${stockHtml}
+                    <span style="font-size:0.75rem; color:#666; font-weight:normal; margin-left:5px;">${p.ml ? formatSize(p) : ""}</span>
+                </div>
+                <div class="btn-qty-wrapper" data-btn-wrap="${p.id}">${buttonHtml}</div>
             </div>
           `;
-          scrollWrapper.appendChild(card);
+          wrapper.appendChild(card);
         });
-
-        wrapperContainer.appendChild(leftBtn);
-        wrapperContainer.appendChild(scrollWrapper);
-        wrapperContainer.appendChild(rightBtn);
-        section.appendChild(wrapperContainer);
 
         const progressContainer = document.createElement("div");
         progressContainer.className = "scroll-progress-container";
         const progressBar = document.createElement("div");
         progressBar.className = "scroll-progress-bar";
         progressContainer.appendChild(progressBar);
+
+        wrapperContainer.appendChild(leftBtn);
+        wrapperContainer.appendChild(wrapper);
+        wrapperContainer.appendChild(rightBtn);
+        section.appendChild(wrapperContainer);
         section.appendChild(progressContainer);
 
-        scrollWrapper.addEventListener("scroll", () => {
-          const scrollLeft = scrollWrapper.scrollLeft;
-          const maxScrollLeft =
-            scrollWrapper.scrollWidth - scrollWrapper.clientWidth;
-          if (maxScrollLeft > 0) {
-            const progress = (scrollLeft / maxScrollLeft) * 100;
-            progressBar.style.width = `${progress}%`;
-            leftBtn.classList.toggle("visible", scrollLeft > 10);
-            rightBtn.classList.toggle("visible", scrollLeft < maxScrollLeft - 10);
+        const updateControls = () => {
+          const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+          const scrollLeft = wrapper.scrollLeft;
+          leftBtn.classList.toggle("visible", scrollLeft > 10);
+          rightBtn.classList.toggle("visible", scrollLeft < maxScroll - 10);
+          if (maxScroll > 0) {
+            const percentage = (scrollLeft / maxScroll) * 100;
+            progressBar.style.width = Math.max(10, percentage) + "%";
+          } else {
+            progressBar.style.width = "100%";
           }
-        });
+        };
 
         leftBtn.onclick = () =>
-          scrollWrapper.scrollBy({ left: -300, behavior: "smooth" });
+          wrapper.scrollBy({ left: -200, behavior: "smooth" });
         rightBtn.onclick = () =>
-          scrollWrapper.scrollBy({ left: 300, behavior: "smooth" });
-
-        setTimeout(() => {
-          if (scrollWrapper.scrollWidth > scrollWrapper.clientWidth) {
-            rightBtn.classList.add("visible");
-          }
-        }, 100);
+          wrapper.scrollBy({ left: 200, behavior: "smooth" });
+        wrapper.addEventListener("scroll", updateControls);
+        setTimeout(updateControls, 100);
 
         return section;
       }
 
-      function switchToGrid(filter) {
+      // --- Brand & Search Logic ---
+      const BRAND_ALIASES = {
+        lv: "Louis Vuitton",
+        "louis vuitton": "Louis Vuitton",
+        louis: "Louis Vuitton",
+        ysl: "Yves Saint Laurent",
+        yves: "Yves Saint Laurent",
+        saint: "Yves Saint Laurent",
+        tf: "Tom Ford",
+        tom: "Tom Ford",
+        ford: "Tom Ford",
+        creed: "Creed",
+        dior: "Dior",
+        chanel: "Chanel",
+        gucci: "Gucci",
+        pdm: "Parfums de Marly",
+        marly: "Parfums de Marly",
+        mfk: "Maison Francis Kurkdjian",
+        kurkdjian: "Maison Francis Kurkdjian",
+        valentino: "Valentino",
+        versace: "Versace",
+        armani: "Giorgio Armani",
+        "giorgio armani": "Giorgio Armani",
+        burberry: "Burberry",
+        lattafa: "Lattafa",
+        kayali: "Kayali",
+        bond: "Bond No. 9",
+        "bond no 9": "Bond No. 9",
+        jpg: "JEAN PAUL GAULTIER",
+      };
+
+      function detectBrandIntent(rawTerm) {
+        const lowerTerm = rawTerm.toLowerCase().trim();
+        const tokens = lowerTerm.split(/\s+/);
+        for (const [key, brandName] of Object.entries(BRAND_ALIASES)) {
+          if (lowerTerm.includes(key)) return brandName;
+        }
+        for (const token of tokens) {
+          if (BRAND_ALIASES[token]) return BRAND_ALIASES[token];
+        }
+        return null;
+      }
+      function normalizeAndTokenize(rawTerm) {
+        return rawTerm
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter((t) => t.length > 0);
+      }
+      function calculateRelevanceScore(product, searchTokens) {
+        let score = 0;
+        const pId = (product.id || "").toString().toLowerCase();
+        const pName = (product.name || "").toLowerCase();
+        const pBrand = (product.brand || "").toLowerCase();
+        searchTokens.forEach((token) => {
+          if (token.length < 1) return;
+          if (pId.includes(token)) score += 100;
+          if (pBrand.includes(token)) score += 60;
+          if (pName.includes(token)) score += 50;
+        });
+        return score;
+      }
+
+      // --- Grid Render ---
+      function switchToGrid(criteria) {
         viewMode = "grid";
-        currentPage = 1;
         document.getElementById("home-view").style.display = "none";
         document.getElementById("grid-view").style.display = "block";
         window.scrollTo({ top: 0, behavior: "smooth" });
 
         const db = (window.perfumeDB || []).filter(
-          (p) => parseInt(p.stock) > 0 || parseInt(p.stock2) > 0,
+          (p) => parseInt(p.stock) > 0,
         );
-        let title = "All Products";
+        let filtered = [];
+        let title = "";
 
-        if (filter === "All") {
-          currentGridData = db;
+        if (criteria === "All") {
+          filtered = (window.perfumeDB || []).filter(p => parseInt(p.stock) > 0);
           title = "All Products";
-        } else if (filter === "BestSellers") {
-          currentGridData = db.filter((p) => Number(p.top) > 0);
-          title = "Best Sellers 🔥";
-        } else if (filter === "New") {
-          currentGridData = db.filter((p) => Number(p.new) > 0);
-          title = "New Arrivals 🆕";
-        } else if (filter === "Sale") {
-          currentGridData = db.filter((p) => Number(p.sale) > 0);
-          title = "On Sale 🏷️";
-        } else if (filter.startsWith("Gender:")) {
-          const g = filter.split(":")[1].toLowerCase();
-          currentGridData = db.filter(
-            (p) => p.gender && p.gender.toLowerCase().includes(g),
-          );
-          title = `${filter.split(":")[1]} Perfumes`;
-        } else if (filter === "Other") {
-          currentGridData = db.filter((p) => {
-            for (let b of FEATURED_BRANDS) {
-              if (p.brand.toLowerCase().includes(b.toLowerCase())) return false;
-            }
-            return true;
+        } else if (criteria === "BestSellers") {
+          // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
+          filtered = db
+            .filter((p) => Number(p.top) > 0)
+            .sort((a, b) => Number(a.top) - Number(b.top));
+          title = "Best Sellers";
+        } else if (criteria === "New") {
+          // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
+          filtered = db
+            .filter((p) => Number(p.new) > 0)
+            .sort((a, b) => Number(a.new) - Number(b.new));
+          title = "New Arrivals";
+        } else if (criteria === "Sale") {
+          // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
+          filtered = db
+            .filter((p) => Number(p.sale) > 0)
+            .sort((a, b) => Number(a.sale) - Number(b.sale));
+          title = "On Sale";
+        } else if (criteria === "Set") {
+          filtered = db.filter((p) => p.name.toUpperCase().includes("SET"));
+          title = "Gift Sets Collection";
+        } else if (criteria.startsWith("Gender:")) {
+          const targetGender = criteria.split(":")[1];
+          filtered = db.filter((p) => {
+            if (!p.gender) return false;
+            const gClass = getGenderClass(p.gender);
+            return gClass === targetGender.toLowerCase();
           });
-          title = "Other Brands";
+          title =
+            targetGender === "Women"
+              ? "For Her (Women)"
+              : targetGender === "Men"
+                ? "For Him (Men)"
+                : "Unisex Collection";
+        } else if (criteria.startsWith("Search:")) {
+          const rawTerm = criteria.replace("Search:", "").trim();
+          const targetBrand = detectBrandIntent(rawTerm);
+          const searchTokens = normalizeAndTokenize(rawTerm);
+          if (targetBrand) {
+            let brandProducts = db.filter(
+              (p) => p.brand.toLowerCase() === targetBrand.toLowerCase(),
+            );
+            let remainingTokens = searchTokens.filter(
+              (t) =>
+                !Object.keys(BRAND_ALIASES).some(
+                  (k) =>
+                    BRAND_ALIASES[k] === targetBrand &&
+                    (k.includes(t) || t.includes(k)),
+                ),
+            );
+            if (remainingTokens.length > 0) {
+              let scored = brandProducts
+                .map((p) => ({
+                  product: p,
+                  score: calculateRelevanceScore(p, remainingTokens),
+                }))
+                .filter((item) => item.score > 0);
+              scored.sort((a, b) => b.score - a.score);
+              filtered = scored.map((item) => item.product);
+            } else {
+              filtered = brandProducts;
+            }
+            title = `Brand Results: "${targetBrand}"`;
+          } else {
+            let scoredProducts = db
+              .map((p) => ({
+                product: p,
+                score: calculateRelevanceScore(p, searchTokens),
+              }))
+              .filter((item) => item.score > 0);
+            scoredProducts.sort((a, b) => b.score - a.score);
+            filtered = scoredProducts.map((item) => item.product);
+            title = `Results: "${rawTerm}"`;
+          }
+        } else if (criteria === "Other") {
+          filtered = db.filter((p) => {
+            const pBrandLower = p.brand ? p.brand.toLowerCase() : "";
+            return pBrandLower && !FEATURED_BRANDS_LOWER.includes(pBrandLower);
+          });
+          title = "More Brands";
         } else {
-          currentGridData = db.filter((p) =>
-            p.brand.toLowerCase().includes(filter.toLowerCase()),
-          );
-          title = filter.toUpperCase();
+          filtered = db.filter((p) => p.brand === criteria);
+          title = criteria;
         }
 
         document.getElementById("grid-title").textContent = title;
+        currentGridData = filtered;
+        currentPage = 1;
         renderGridPage();
       }
 
       function renderGridPage() {
         const gallery = document.getElementById("gallery");
-        const pagination = document.getElementById("pagination-controls");
         gallery.innerHTML = "";
-        pagination.innerHTML = "";
+        const totalPages = Math.ceil(currentGridData.length / itemsPerPage);
+        renderPagination(totalPages, currentPage);
 
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        const pageItems = currentGridData.slice(start, end);
-
-        if (pageItems.length === 0) {
-          gallery.innerHTML = `<div style="grid-column: span 2; text-align:center; padding: 40px; color:#777;">No products found.</div>`;
+        if (currentGridData.length === 0) {
+          gallery.innerHTML =
+            "<div style='grid-column:1/-1;text-align:center;padding:50px;color:#999;'>No items found.</div>";
           return;
         }
+        const start = (currentPage - 1) * itemsPerPage;
+        const pageItems = currentGridData.slice(start, start + itemsPerPage);
 
-        pageItems.forEach((product) => {
-          const itemDiv = document.createElement("div");
-          itemDiv.className = "item";
-          itemDiv.onclick = () => openModal(product);
+        pageItems.forEach((p) => {
+          const div = document.createElement("div");
+          div.className = "item";
+          let badgesHtml = "";
+          if (p.top == 1)
+            badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
+          if (p.new == 1)
+            badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
+          if (p.sale == 1)
+            badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
+          const webpSrc = p.img.replace(/\.(jpg|png|jpeg)$/i, ".webp");
+          const genderClass = getGenderClass(p.gender);
+          const genderText = p.gender
+            ? ` · <span class="gender-tag ${genderClass}">${p.gender}</span>`
+            : "";
+          const stockHtml = getStockHtml(p.inventory);
 
-          const pictureHtml = generatePictureHTML(product.img, product.name);
-          let badgesHtml = '<div class="badges-container">';
-          if (Number(product.top) > 0)
-            badgesHtml += '<span class="badge-tag badge-hot">HOT</span>';
-          if (Number(product.new) > 0)
-            badgesHtml += '<span class="badge-tag badge-new">NEW</span>';
-          if (Number(product.sale) > 0)
-            badgesHtml += '<span class="badge-tag badge-sale">SALE</span>';
-          badgesHtml += "</div>";
+          // Use NEW button logic
+          const buttonHtml = getAddButtonHtml(p.id);
 
-          const stockHtml = getStockHtml(product.inventory);
-
-          const genderClass = getGenderClass(product.gender);
-          const genderTag = product.gender ? `<span class="gender-tag ${genderClass}">${product.gender}</span>` : "";
-          const idStr = product.id ? `<span style="font-size:0.75rem; color:#888; font-weight:normal; margin-right:4px;">[${product.id}]</span>` : "";
-
-          itemDiv.innerHTML = `
-            <div class="item-img-box" style="position:relative;">
-              ${pictureHtml}
-              ${badgesHtml}
-            </div>
-            <div class="caption">
-              <div class="scroll-card-title">${idStr}${product.name}</div>
-              <div style="margin-bottom:4px;">${genderTag}</div>
-              <div class="item-price">$${Number(product.price).toFixed(2)}${stockHtml}</div>
-              <div class="btn-qty-wrapper">
-                ${getAddButtonHtml(product.name)}
+          // 核心修改 2：给按钮包裹层统一增加 data-btn-wrap 属性
+          div.innerHTML = `
+              <div class="item-img-box skeleton-loader" onclick="openModalById('${p.id}')">
+                  <picture><source srcset="${webpSrc}" type="image/webp"><img src="${p.img}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture>
+                  <div class="badges-container">${badgesHtml}</div>
               </div>
-            </div>
-          `;
-          gallery.appendChild(itemDiv);
+              <div class="caption">
+                 <div style="font-size:0.85rem; height:2.4em; overflow:hidden; margin-bottom:5px; line-height:1.2;">${p.id}-${p.name}</div>
+                 <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">${p.brand}${genderText} <br> ${formatSize(p)}</div>
+                 <div class="item-price">$${p.price} ${stockHtml}</div>
+                 <div class="btn-qty-wrapper" data-btn-wrap="${p.id}">${buttonHtml}</div>
+              </div>
+           `;
+          gallery.appendChild(div);
         });
+      }
 
-        const totalPages = Math.ceil(currentGridData.length / itemsPerPage);
-        if (totalPages > 1) {
-          for (let i = 1; i <= totalPages; i++) {
-            const btn = document.createElement("button");
-            btn.className = `page-btn ${i === currentPage ? "active" : ""}`;
-            btn.textContent = i;
+      function renderPagination(totalPages, activePage) {
+        const container = document.getElementById("pagination-controls");
+        if (!container) return;
+        container.innerHTML = "";
+        if (totalPages <= 1) {
+          container.style.display = "none";
+          return;
+        }
+        container.style.display = "flex";
+
+        const createBtn = (
+          text,
+          page,
+          isActive = false,
+          isDisabled = false,
+        ) => {
+          const btn = document.createElement("button");
+          btn.className = `page-btn ${isActive ? "active" : ""}`;
+          btn.textContent = text;
+          if (isDisabled) btn.disabled = true;
+          else
             btn.onclick = () => {
-              currentPage = i;
+              currentPage = page;
               renderGridPage();
               window.scrollTo({ top: 0, behavior: "smooth" });
             };
-            pagination.appendChild(btn);
-          }
-        }
-      }
+          return btn;
+        };
 
-      function openModal(product) {
-        currentModalProductId = product.name;
-        document.getElementById("modal-img").src = product.img;
-        document.getElementById("modal-title").textContent = product.name;
-
-        const sizeStr = formatSize(product);
-        const genderClass = getGenderClass(product.gender);
-        const genderTag = product.gender
-          ? `<span class="gender-tag ${genderClass}">${product.gender}</span>`
-          : "";
-        
-        const idStr = product.id ? `ID: ${product.id} • ` : "";
-        document.getElementById("modal-sub").innerHTML = `${idStr}${product.brand} ${sizeStr ? "• " + sizeStr : ""} ${genderTag}`;
-        document.getElementById("modal-stock").innerHTML = getStockHtml(
-          product.inventory,
+        container.appendChild(
+          createBtn("Prev", activePage - 1, false, activePage === 1),
         );
-        document.getElementById("modal-price").textContent =
-          `$${Number(product.price).toFixed(2)}`;
-
-        document.getElementById("modal-action-area").innerHTML = `
-          <div style="margin-top: 10px;">
-            ${getAddButtonHtml(product.name)}
-          </div>
-        `;
-
-        document.getElementById("modal").classList.add("open");
+        const pages = [];
+        if (totalPages <= 7) {
+          for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+          pages.push(1);
+          if (activePage > 3) pages.push("...");
+          let s = Math.max(2, activePage - 1),
+            e = Math.min(totalPages - 1, activePage + 1);
+          if (activePage === 1) e = 3;
+          if (activePage === totalPages) s = totalPages - 2;
+          for (let i = s; i <= e; i++) pages.push(i);
+          if (activePage < totalPages - 2) pages.push("...");
+          pages.push(totalPages);
+        }
+        pages.forEach((p) => {
+          if (p === "...") {
+            const span = document.createElement("span");
+            span.textContent = "...";
+            span.style.padding = "0 5px";
+            span.style.color = "#999";
+            container.appendChild(span);
+          } else container.appendChild(createBtn(p, p, p === activePage));
+        });
+        container.appendChild(
+          createBtn("Next", activePage + 1, false, activePage === totalPages),
+        );
       }
 
-      function setupModalBackdropClosing() {
-        ["modal", "policy-modal"].forEach((modalId) => {
-          const m = document.getElementById(modalId);
-          if (m) {
-            m.onclick = (e) => {
-              if (e.target === m) m.classList.remove("open");
-            };
-          }
+      window.openModal = function (product) {
+        currentModalProductId = product.id;
+        document.getElementById("modal-img").src = product.img;
+        document.getElementById("modal-title").textContent =
+          `${product.id}-${product.name}`;
+        const notesContent = product.Notes || product.notes;
+        let notesHtml = "";
+        if (notesContent && notesContent.trim() !== "") {
+          notesHtml = `<div class="modal-notes-box"><span class="modal-notes-title">Fragrance Notes</span><span class="modal-notes-text">${notesContent}</span></div>`;
+        }
+        const genderClass = getGenderClass(product.gender);
+        document.getElementById("modal-sub").innerHTML =
+          `<div style="font-size:1.1rem; color:#333; margin-bottom:5px;">${product.brand}</div><div style="margin-bottom:8px; font-size:0.85rem; color:#555; display:flex; align-items:center; justify-content:center;"><span class="gender-tag ${genderClass}" style="font-size:0.8rem; margin:0 5px 0 0;">${product.gender || "Unisex"}</span><span style="color:#ccc">|</span> <span style="margin-left:5px">${formatSize(product)}</span></div>${notesHtml}`;
+
+        const stockEl = document.getElementById("modal-stock");
+        const stockVal = getStockHtml(product.inventory);
+        if (stockVal) {
+          stockEl.innerHTML = `<div style="color:#d9534f; font-weight:bold; font-size:0.95rem; border:1px solid #d9534f; display:inline-block; padding:3px 10px; border-radius:4px; background:#fff0f0;">🔥 Fast Moving: Only ${product.inventory} Left!</div>`;
+          stockEl.style.display = "block";
+        } else {
+          stockEl.style.display = "none";
+        }
+
+        document.getElementById("modal-price").textContent =
+          "$" + product.price;
+        updateModalButtonState(product.id);
+        document.getElementById("modal").classList.add("open");
+      };
+
+      window.openModalById = function (id) {
+        const p = window.perfumeDB.find((x) => x.id === id);
+        if (p) openModal(p);
+      };
+
+      function setupSearch() {
+        const globalSearch = document.getElementById("global-search-input");
+        globalSearch.addEventListener("change", (e) => {
+          const val = e.target.value.trim();
+          if (val) switchToGrid("Search:" + val);
         });
       }
+
+      window.handleMenuClick = function (action) {
+        document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-overlay").classList.remove("active");
+        if (action === "Home") {
+          viewMode = "home";
+          document.getElementById("home-view").style.display = "block";
+          document.getElementById("grid-view").style.display = "none";
+          window.scrollTo({ top: 0 });
+        } else switchToGrid(action);
+      };
+
+      window.scrollToBrand = function (brandName) {
+        if (viewMode !== "home") {
+          document.getElementById("home-view").style.display = "block";
+          document.getElementById("grid-view").style.display = "none";
+          viewMode = "home";
+        }
+        document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-overlay").classList.remove("active");
+        setTimeout(() => {
+          const safeName =
+            brandName === "Other" ? "Other" : brandName.replace(/\s+/g, "");
+          const targetId = "brand-" + safeName;
+          const element = document.getElementById(targetId);
+          if (element) {
+            const headerOffset = 65;
+            const elementPosition = element.getBoundingClientRect().top;
+            const offsetPosition =
+              elementPosition + window.pageYOffset - headerOffset;
+            window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+          } else switchToGrid(brandName === "Other" ? "Other" : brandName);
+        }, 50);
+      };
 
       function setupMenu() {
         const trigger = document.getElementById("menu-trigger");
         const overlay = document.getElementById("sidebar-overlay");
         const sidebar = document.getElementById("sidebar");
-
-        const toggleMenu = () => {
+        function toggle() {
           sidebar.classList.toggle("active");
           overlay.classList.toggle("active");
-        };
-
-        if (trigger) trigger.onclick = toggleMenu;
-        if (overlay) overlay.onclick = toggleMenu;
+        }
+        trigger.onclick = toggle;
+        overlay.onclick = toggle;
       }
 
-      function handleMenuClick(action) {
-        document.getElementById("sidebar").classList.remove("active");
-        document.getElementById("sidebar-overlay").classList.remove("active");
-
-        if (action === "Home") {
-          renderHome();
-        } else if (action === "All") {
-          switchToGrid("All");
-        } else if (action === "BestSellers") {
-          switchToGrid("BestSellers");
-        } else if (action === "New") {
-          switchToGrid("New");
-        } else if (action.startsWith("Gender:")) {
-          switchToGrid(action);
-        }
+      // Toast 函数供页面任何位置调用
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 2000);
       }
 
-      function scrollToBrand(brandName) {
-        document.getElementById("sidebar").classList.remove("active");
-        document.getElementById("sidebar-overlay").classList.remove("active");
+      window.updateItemQty = function (id, delta) {
+        const db = window.perfumeDB;
+        const product = db.find((p) => p.id === id);
+        if (!product) return;
 
-        if (viewMode !== "home") {
-          renderHome();
-          setTimeout(() => performScrollToBrand(brandName), 200);
-        } else {
-          performScrollToBrand(brandName);
+        let existing = cartItems.find((c) => c.name === id);
+        if (!existing && delta > 0) {
+          let sizeLabel = product.ml
+            ? isNaN(Number(product.ml))
+              ? `(${product.ml})`
+              : `(${product.ml}ml)`
+            : "";
+          cartItems.push({
+            name: id,
+            caption: `${id} - ${product.name} ${sizeLabel}`,
+            img: product.img,
+            price: Number(product.price),
+            brand: product.brand,
+            ml: product.ml,
+            quantity: 1,
+          });
+          showToast("Added to Cart! 🛒");
+        } else if (existing) {
+          existing.quantity += delta;
+          if (existing.quantity <= 0)
+            cartItems = cartItems.filter((c) => c.name !== id);
         }
+
+        saveCart();
+        updateWholesaleBanner();
+
+        // 核心修改 2：通过 data-btn-wrap 找到所有对应这个商品ID的容器，统一批量更新！
+        const newBtnHtml = getAddButtonHtml(id);
+        document.querySelectorAll(`[data-btn-wrap="${id}"]`).forEach((wrap) => {
+          wrap.innerHTML = newBtnHtml;
+        });
+
+        // 弹窗内的独立更新逻辑
+        if (currentModalProductId === id) updateModalButtonState(id);
+      };
+
+      function updateModalButtonState(id) {
+        const container = document.getElementById("modal-action-area");
+        container.innerHTML = getAddButtonHtml(id);
       }
 
-      function performScrollToBrand(brandName) {
-        const targetId = "brand-" + brandName.replace(/\s+/g, "");
-        const el = document.getElementById(targetId);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
-        } else {
-          switchToGrid(brandName);
-        }
+      function loadCart() {
+        cartItems = JSON.parse(localStorage.getItem("perfumeCart") || "[]");
+        updateCartCount();
+        updateWholesaleBanner();
+      }
+      function saveCart() {
+        localStorage.setItem("perfumeCart", JSON.stringify(cartItems));
+        updateCartCount();
+      }
+      function updateCartCount() {
+        const el = document.getElementById("header-cart-count");
+        if (el) el.textContent = cartItems.reduce((s, i) => s + i.quantity, 0);
+      }
+      function setupModalBackdropClosing() {
+        document.querySelectorAll(".modal").forEach((o) =>
+          o.addEventListener("click", (e) => {
+            if (e.target === o) {
+              o.classList.remove("open");
+              currentModalProductId = null;
+            }
+          }),
+        );
       }
     </script>
   </body>
