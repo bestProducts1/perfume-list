@@ -1959,6 +1959,7 @@
         setupQuickGuide();
         setupBackToTop();
         setupModalBackdropClosing();
+        setupModalKeyboardControls();
         setupSearch();
 
         const checkDataInterval = setInterval(() => {
@@ -3617,6 +3618,27 @@
             }
           }),
         );
+      }
+
+      function setupModalKeyboardControls() {
+        document.addEventListener("keydown", (event) => {
+          if (event.key !== "Escape") return;
+
+          const warehouseModal = document.getElementById(
+            "warehouse-choice-modal",
+          );
+          if (warehouseModal.classList.contains("open")) {
+            event.preventDefault();
+            closeWarehouseChoice();
+            return;
+          }
+
+          const productModal = document.getElementById("modal");
+          if (productModal.classList.contains("open")) {
+            event.preventDefault();
+            closeProductModal();
+          }
+        });
       }
     </script>
   </body>

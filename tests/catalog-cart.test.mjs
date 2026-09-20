@@ -18,6 +18,7 @@ const item = (overrides = {}) => ({
 function createContext(page = 'index.html') {
   const memory = new Map();
   const elements = new Map();
+  const documentListeners = new Map();
   function element(id = '') {
     if (elements.has(id)) return elements.get(id);
     const classes = new Set();
@@ -36,7 +37,17 @@ function createContext(page = 'index.html') {
     requestAnimationFrame: (fn) => fn(),
     addEventListener() {}, dispatchEvent() {}, scrollTo() {},
     location: { href: page, host: 'example.test' },
-    document: { addEventListener() {}, getElementById: element, createElement: () => element(`created-${elements.size}`), querySelector: element, querySelectorAll: () => [], activeElement: element('focus') },
+    document: {
+      addEventListener(type, handler) {
+        if (!documentListeners.has(type)) documentListeners.set(type, []);
+        documentListeners.get(type).push(handler);
+      },
+      getElementById: element,
+      createElement: () => element(`created-${elements.size}`),
+      querySelector: element,
+      querySelectorAll: () => [],
+      activeElement: element('focus'),
+    },
     localStorage: { getItem: (key) => memory.get(key) ?? null, setItem: (key, val) => memory.set(key, String(val)), removeItem: (key) => memory.delete(key) },
     fetch: async () => { throw new Error('offline'); },
     alert: () => { throw new Error('Unexpected native alert'); },
@@ -49,7 +60,16 @@ function createContext(page = 'index.html') {
     .map((match) => match[1]).filter((code) => code.includes(page === 'index.html' ? 'const WHATSAPP_NUMBER' : 'function toggleSidebar'));
   assert.equal(scripts.length, 1);
   vm.runInContext(scripts[0], sandbox);
-  return { sandbox, memory, element, setCart: (cart) => memory.set('perfumeCart', JSON.stringify(cart)), cart: () => plain(sandbox.readStoredCart()) };
+  return {
+    sandbox,
+    memory,
+    element,
+    dispatchDocument(type, event) {
+      (documentListeners.get(type) || []).forEach((handler) => handler(event));
+    },
+    setCart: (cart) => memory.set('perfumeCart', JSON.stringify(cart)),
+    cart: () => plain(sandbox.readStoredCart()),
+  };
 }
 
 test('positive stock is orderable while zero stock and unknown prices are blocked', () => {
@@ -176,6 +196,19 @@ test('shipping is always free and both pages preserve the original discount sche
   assert.deepEqual(plain(vm.runInContext('discountTiers.map((tier) => tier.percent)', home)), expected);
   assert.deepEqual(plain(vm.runInContext('tiers.map((tier) => tier.percent)', cart)), expected);
   assert.doesNotMatch(source('cart.html'), /fbq|fbevents|facebook\.com\/tr/i);
+});
+
+test('Escape closes the enlarged product card without reacting to other keys', () => {
+  const { sandbox: s, element, dispatchDocument } = createContext();
+  s.setupModalKeyboardControls();
+  const modal = element('modal');
+  modal.classList.add('open');
+  dispatchDocument('keydown', { key: 'Enter', preventDefault() {} });
+  assert.equal(modal.classList.contains('open'), true);
+  let prevented = false;
+  dispatchDocument('keydown', { key: 'Escape', preventDefault() { prevented = true; } });
+  assert.equal(modal.classList.contains('open'), false);
+  assert.equal(prevented, true);
 });
 
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
