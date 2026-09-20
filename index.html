@@ -99,6 +99,7 @@
 
       .header-center {
         flex-grow: 1;
+        min-width: 0;
         display: flex;
         justify-content: flex-end;
       }
@@ -118,23 +119,42 @@
         color: #000;
         border-color: #fff;
       }
-
-      /* 右上角 Tracking 模块样式 */
-      .header-right {
-        position: relative;
-        cursor: pointer;
-        display: flex;
+      .header-back-btn {
+        display: none;
         align-items: center;
-        flex-shrink: 0;
-        padding-right: 5px;
-        gap: 6px;
-      }
-      .track-text {
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
+        justify-content: center;
+        min-width: 44px;
+        height: 44px;
+        padding: 0 2px;
+        border: 0;
+        background: transparent;
         color: #fff;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        transition: color 0.2s;
+      }
+      .header-back-btn.visible {
+        display: flex;
+      }
+      .header-back-btn:hover,
+      .header-back-btn:focus-visible {
+        color: #d8b733;
+      }
+      .header-back-btn:active {
+        color: #b28900;
+      }
+
+      @media (max-width: 519px) {
+        .site-header {
+          padding: 0 8px;
+          gap: 8px;
+        }
+        .header-back-btn {
+          padding: 0;
+        }
       }
 
       /* ================= 3. Sidebar ================= */
@@ -208,23 +228,121 @@
         border-bottom: 1px solid #eee;
         text-transform: uppercase;
       }
-      .brand-list {
+      .warehouse-navigation {
+        display: grid;
+        gap: 10px;
+      }
+      .warehouse-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .warehouse-toggle {
+        position: relative;
+        width: 100%;
+        min-height: 66px;
+        padding: 11px 36px 11px 12px;
+        border: 1px solid rgba(255, 215, 0, 0.42);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.96);
+        color: #222;
+        cursor: pointer;
         display: flex;
         flex-direction: column;
-        gap: 0;
+        align-items: flex-start;
+        justify-content: center;
+        text-align: left;
+        font: inherit;
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.4px;
       }
-      .brand-item {
-        padding: 12px 5px;
-        font-size: 0.95rem;
+      .warehouse-toggle-label {
+        flex: 1;
+      }
+      .warehouse-count {
+        margin-top: 3px;
+        color: #777;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+      .warehouse-toggle::after {
+        content: "+";
+        position: absolute;
+        top: 50%;
+        right: 12px;
+        transform: translateY(-50%);
+        color: var(--accent-color);
+        font-size: 1.3rem;
+        font-weight: 400;
+      }
+      .warehouse-toggle.active::after {
+        content: "−";
+        color: #111;
+      }
+      .warehouse-toggle.active {
+        border-color: #ffd700;
+        background: #ffd700;
+      }
+      .warehouse-toggle.active .warehouse-count {
+        color: #554500;
+      }
+      .warehouse-brand-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid rgba(255, 215, 0, 0.42);
+        border-radius: 8px;
+        background: #fff;
+      }
+      .warehouse-brand-item {
+        width: 100%;
+        min-height: 44px;
+        padding: 9px 11px;
+        border: 1px solid #ece7dc;
+        border-radius: 6px;
+        background: #fbfaf7;
         color: #555;
         cursor: pointer;
-        border-bottom: 1px solid #f0f0f0;
+        text-align: left;
+        font: inherit;
+        font-size: 0.82rem;
+        line-height: 1.2;
       }
-      .brand-item:hover {
+      .warehouse-brand-item:hover,
+      .warehouse-brand-item:focus-visible {
         color: #000;
-        background: #f4f4f4;
-        padding-left: 10px;
-        font-weight: bold;
+        background: #f8f5ed;
+        font-weight: 700;
+      }
+      .warehouse-brand-item.all-products {
+        grid-column: 1 / -1;
+        background: #fff8db;
+        border-color: #ead58b;
+        color: var(--accent-color);
+        font-weight: 800;
+      }
+      .warehouse-empty {
+        grid-column: 1 / -1;
+        margin: 10px 4px 2px;
+        color: #999;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      .warehouse-brand-more {
+        display: none;
+        grid-column: 1 / -1;
+        width: 100%;
+        min-height: 44px;
+        margin-top: 4px;
+        color: #7b6020;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 800;
+        text-align: center;
       }
 
       /* ================= Wholesale Banner (Top Sticky) ================= */
@@ -284,6 +402,199 @@
         margin-left: 3px;
       }
 
+      /* ================= Mobile Quick Guide ================= */
+      .quick-guide {
+        margin: 8px 10px;
+        padding: 12px;
+        background-color: #101010 !important;
+        background-image: linear-gradient(
+          135deg,
+          rgba(255, 215, 0, 0.1),
+          transparent 42%
+        ) !important;
+        color: #fff;
+        border: 1px solid rgba(255, 215, 0, 0.32);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+        position: relative;
+      }
+      .quick-guide-title {
+        margin: 0 0 3px;
+        font-size: 1.05rem;
+        line-height: 1.15;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+      .quick-guide-subtitle {
+        margin: 0 0 10px;
+        color: #f2d166;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+      .curated-shortcuts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 12px 0 2px;
+      }
+      .curated-shortcut {
+        min-height: 50px;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 215, 0, 0.42);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 800;
+        letter-spacing: 0.35px;
+        text-align: left;
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease,
+          transform 0.2s ease;
+      }
+      .curated-shortcut span {
+        display: block;
+        margin-top: 2px;
+        color: rgba(255, 255, 255, 0.58);
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+      .curated-shortcut:hover,
+      .curated-shortcut:focus-visible {
+        border-color: #ffd700;
+        background: rgba(255, 215, 0, 0.14);
+        transform: translateY(-1px);
+      }
+      .quick-warehouse-heading {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 215, 0, 0.2);
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .quick-warehouse-heading h2 {
+        margin: 0 0 9px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        color: #f2d166;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .quick-warehouse-heading span {
+        margin-bottom: 9px;
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 0.75rem;
+        line-height: 1.3;
+        text-align: right;
+      }
+      @media (min-width: 520px) {
+        .quick-guide {
+          max-width: 1180px;
+          margin: 12px auto 14px;
+          padding: 16px 20px 20px;
+        }
+        .warehouse-toggle {
+          min-height: 54px;
+          padding: 13px 16px;
+          flex-direction: row;
+          align-items: center;
+        }
+        .warehouse-tabs {
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .warehouse-count {
+          margin-top: 0;
+          margin-right: 10px;
+        }
+        .warehouse-toggle::after {
+          position: static;
+          transform: none;
+        }
+        .warehouse-brand-list {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 519px) {
+        body {
+          padding-bottom: 92px;
+        }
+        .ws-banner {
+          padding: 7px 0;
+        }
+        .ws-pills {
+          justify-content: flex-start;
+          flex-wrap: nowrap;
+          gap: 5px;
+          overflow-x: auto;
+          padding: 0 10px;
+          scrollbar-width: none;
+        }
+        .ws-pills::-webkit-scrollbar {
+          display: none;
+        }
+        .ws-pill {
+          flex: 0 0 auto;
+        }
+        .quick-warehouse-heading {
+          display: block;
+        }
+        .quick-warehouse-heading span {
+          display: block;
+          margin-top: -4px;
+          text-align: left;
+        }
+        .warehouse-brand-item.mobile-extra-brand {
+          display: none;
+        }
+        .warehouse-brand-list.show-all-brands
+          .warehouse-brand-item.mobile-extra-brand {
+          display: block;
+        }
+        .warehouse-brand-item.mobile-last-brand {
+          grid-column: 1 / -1;
+        }
+        .warehouse-brand-more {
+          display: block;
+        }
+      }
+
+      .back-to-top-btn {
+        position: fixed;
+        right: 16px;
+        bottom: 108px;
+        z-index: 981;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: #000;
+        color: #ffd700;
+        border: 1px solid rgba(255, 215, 0, 0.65);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(8px);
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease,
+          visibility 0.2s ease;
+      }
+      .back-to-top-btn.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
       /* ================= NEW Floating Capsule Bottom Bar (Split Pill Design) ================= */
       .bottom-nav-bar {
         position: fixed;
@@ -304,6 +615,16 @@
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         border: 1px solid rgba(0, 0, 0, 0.03);
         overflow: hidden; /* 裁切内部 */
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease,
+          visibility 0.2s ease;
+      }
+      .bottom-nav-bar.empty-cart {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translate(-50%, calc(100% + 40px));
       }
 
       /* Left Side: Asset Area (45%) */
@@ -410,6 +731,11 @@
       .checkout-pill-btn:active {
         background-color: #1ebc57;
       }
+      .checkout-pill-btn:disabled {
+        background: #d9d7d1;
+        color: #77736c;
+        cursor: not-allowed;
+      }
 
       /* ================= BUTTON STYLES (Cards) ================= */
       .action-btn-black {
@@ -425,6 +751,45 @@
         display: block;
         border: none;
         text-transform: uppercase;
+      }
+      .action-btn-black:disabled,
+      .action-btn-black.price-pending {
+        background: #ece9e2;
+        border-color: #d7d1c5;
+        color: #81796b;
+        cursor: not-allowed;
+      }
+      .price-pending-label {
+        color: #8a8173;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .price-pending-action {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        color: #8a8173;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+      .warehouse-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 20px;
+        padding: 2px 6px;
+        border: 1px solid #dfd4b9;
+        border-radius: 999px;
+        background: #fbf7ec;
+        color: #7b6020;
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .warehouse-tag.multi-warehouse {
+        border-color: #d2ad32;
+        background: #fff8d8;
+        color: #5e4700;
       }
 
       .action-qty-box {
@@ -458,6 +823,28 @@
         color: #000;
         text-align: center;
         font-family: inherit;
+      }
+      .qty-warehouse-switch {
+        align-self: stretch;
+        border: 0;
+        background: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.18s ease;
+      }
+      .qty-warehouse-switch:hover,
+      .qty-warehouse-switch:focus-visible {
+        background: #fff7d6;
+        outline: none;
+      }
+      .qty-warehouse-code {
+        color: #8a6a00;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.05em;
       }
 
       .btn-qty-wrapper {
@@ -526,7 +913,12 @@
         color: #666;
         text-decoration: underline;
         cursor: pointer;
+        min-width: 44px;
+        min-height: 44px;
         padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
       }
       .scroll-container-wrapper {
         position: relative;
@@ -693,6 +1085,12 @@
         transition: transform 0.2s;
         font-family: inherit;
       }
+      .shop-all-copy {
+        margin: 0 0 12px;
+        color: #666;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
 
       /* ================= Grid View ================= */
       #grid-view {
@@ -705,18 +1103,59 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 20px;
+        gap: 12px;
+        min-height: 60px;
+        margin: -20px -12px 20px;
+        padding: 12px;
+        position: sticky;
+        top: var(--header-height);
+        z-index: 980;
+        background: rgba(248, 248, 248, 0.97);
+        border-bottom: 1px solid #e3e3e3;
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
       }
       .gallery-title {
         font-size: 1.3rem;
         font-weight: 700;
+        line-height: 1.2;
+        min-width: 0;
       }
       .back-home-btn {
-        font-size: 0.9rem;
-        text-decoration: underline;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 8px 11px;
+        border: 1px solid #d5d5d5;
+        border-radius: 999px;
+        background: #fff;
+        font-size: 0.82rem;
+        font-weight: 700;
         cursor: pointer;
-        color: #666;
-        padding: 5px;
+        color: #555;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .back-home-btn:hover,
+      .back-home-btn:focus-visible {
+        border-color: #b28900;
+        color: #7b6020;
+      }
+      @media (max-width: 519px) {
+        .gallery-header-bar {
+          min-height: 56px;
+          padding: 9px 12px;
+        }
+        .gallery-title {
+          font-size: 1.05rem;
+        }
+        .back-home-btn {
+          min-height: 38px;
+          padding: 7px 10px;
+          font-size: 0.76rem;
+        }
       }
       .gallery {
         display: grid;
@@ -854,16 +1293,19 @@
       }
       .modal-close {
         position: absolute;
-        top: 10px;
-        right: 10px;
+        top: 8px;
+        right: 8px;
         font-size: 1.8rem;
         cursor: pointer;
         z-index: 10;
-        width: 36px;
-        height: 36px;
+        width: 48px;
+        height: 48px;
         background: rgba(0, 0, 0, 0.1);
         border-radius: 50%;
-        line-height: 34px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .modal-img {
         width: 100%;
@@ -873,6 +1315,18 @@
       }
       .modal-info {
         padding: 8px 15px;
+      }
+      .modal-back-btn {
+        width: 100%;
+        min-height: 38px;
+        margin-top: 10px;
+        border-radius: 6px;
+        background: #000;
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 800;
+        letter-spacing: 0;
       }
       .modal-notes-box {
         background-color: #f7f7f7;
@@ -897,6 +1351,91 @@
         line-height: 1.3;
         font-family: Georgia, serif;
         font-style: italic;
+      }
+      .warehouse-choice-content {
+        max-width: 420px;
+        padding: 28px 22px 22px;
+        border: 1px solid #d4ad22;
+        text-align: left;
+      }
+      .warehouse-choice-eyebrow {
+        margin: 0 0 6px;
+        color: #9a7300;
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .warehouse-choice-title {
+        margin: 0;
+        color: #111;
+        font-size: 1.35rem;
+        line-height: 1.2;
+      }
+      .warehouse-choice-copy {
+        margin: 8px 0 16px;
+        color: #69645a;
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+      .warehouse-choice-options {
+        display: grid;
+        gap: 9px;
+      }
+      .warehouse-choice-option {
+        width: 100%;
+        min-height: 64px;
+        padding: 11px 13px;
+        border: 1px solid #d8d3c9;
+        border-radius: 8px;
+        background: #fff;
+        color: #171717;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .warehouse-choice-option.selected {
+        border: 2px solid #111;
+        background: #fff9dc;
+        box-shadow: inset 5px 0 0 #e1b800;
+      }
+      .warehouse-choice-option-main {
+        display: grid;
+        gap: 3px;
+      }
+      .warehouse-choice-option strong {
+        font-size: 1rem;
+      }
+      .warehouse-choice-sku {
+        color: #777168;
+        font-size: 0.72rem;
+      }
+      .warehouse-recommended {
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: #111;
+        color: #ffd700;
+        font-size: 0.64rem;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .warehouse-choice-confirm {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 14px;
+        border: 0;
+        border-radius: 7px;
+        background: #111;
+        color: #fff;
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 900;
+        cursor: pointer;
       }
       .gender-tag {
         display: inline-block;
@@ -949,6 +1488,21 @@
         opacity: 1;
         bottom: 130px;
       }
+      @media (max-width: 519px) {
+        .bottom-nav-bar {
+          bottom: 12px;
+          height: 64px;
+        }
+        .scroll-arrow-btn {
+          display: none;
+        }
+        .shop-all-section {
+          margin: 0 10px 18px;
+          padding: 22px 16px;
+          border: 1px solid #e8e3d8;
+          border-radius: 8px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -965,25 +1519,16 @@
           placeholder="Search..."
         />
       </div>
-      <div class="header-right" onclick="openTrackingModal()">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="white"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <rect x="1" y="3" width="15" height="13"></rect>
-          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-          <circle cx="5.5" cy="18.5" r="2.5"></circle>
-          <circle cx="18.5" cy="18.5" r="2.5"></circle>
-        </svg>
-        <span class="track-text">TRACK</span>
-      </div>
+      <button
+        type="button"
+        id="header-back-btn"
+        class="header-back-btn"
+        onclick="handleMenuClick('Home')"
+        aria-label="Back to Home"
+        title="Back to Home"
+      >
+        BACK
+      </button>
     </header>
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -995,6 +1540,12 @@
         <nav>
           <a class="menu-link" onclick="handleMenuClick('Home')">Home</a>
           <a class="menu-link" onclick="handleMenuClick('All')">Shop All</a>
+          <a class="menu-link" onclick="handleMenuClick('HotSelling')"
+            >Hot Selling</a
+          >
+          <a class="menu-link" onclick="handleMenuClick('NewArrival')"
+            >New Arrivals</a
+          >
           <a
             class="menu-link"
             onclick="handleMenuClick('Gender:Women')"
@@ -1019,41 +1570,17 @@
             style="color: #6a1b9a"
             >Gift Sets 🎁</a
           >
-          <a class="menu-link" onclick="handleMenuClick('BestSellers')"
-            >Best Sellers 🔥</a
-          >
-          <a class="menu-link" onclick="handleMenuClick('New')"
-            >New Arrivals 🆕</a
-          >
-          <a class="menu-link" href="cart.html">My Cart</a>
           <a
             class="menu-link"
-            onclick="openTrackingModal()"
-            style="
-              color: #000;
-              border-top: 1px solid #eee;
-              margin-top: 10px;
-              padding-top: 20px;
-            "
-            >🚚 Track My Order</a
+            onclick="scrollToBrand('Other')"
+            style="color: #b28900"
+            >Other Brands</a
           >
+          <a class="menu-link" href="cart.html">My Cart</a>
           <a class="menu-link" href="https://wa.me/16232027321" target="_blank"
             >Contact Us</a
           >
         </nav>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee" />
-        <div
-          style="
-            font-weight: 700;
-            margin-bottom: 15px;
-            font-size: 0.85rem;
-            color: #999;
-            letter-spacing: 1px;
-          "
-        >
-          POPULAR BRANDS
-        </div>
-        <div class="brand-list" id="brand-list-container"></div>
         <div style="height: 50px"></div>
       </div>
     </div>
@@ -1062,6 +1589,45 @@
       <div id="wholesale-banner" class="ws-banner">
         <div id="ws-content" class="ws-pills"></div>
       </div>
+
+      <section
+        id="mobile-quick-guide"
+        class="quick-guide"
+        aria-label="Warehouse shopping"
+      >
+        <div class="quick-guide-copy">
+          <h1 class="quick-guide-title">Build Your Order List</h1>
+          <p class="quick-guide-subtitle">
+            Add items to cart. Discounts calculate automatically, and every
+            order ships free.
+          </p>
+        </div>
+        <div class="curated-shortcuts" aria-label="Featured collections">
+          <button
+            class="curated-shortcut"
+            type="button"
+            onclick="switchToGrid('HotSelling')"
+          >
+            HOT SELLING<span>Ranked by your sheet</span>
+          </button>
+          <button
+            class="curated-shortcut"
+            type="button"
+            onclick="switchToGrid('NewArrival')"
+          >
+            NEW ARRIVALS<span>Newest priorities first</span>
+          </button>
+        </div>
+        <div class="quick-warehouse-heading">
+          <h2>Shop by Warehouse</h2>
+          <span>Select a warehouse, then choose a brand</span>
+        </div>
+        <div
+          class="warehouse-navigation"
+          id="warehouse-menu-container"
+          aria-label="Warehouses and brands"
+        ></div>
+      </section>
 
       <div id="home-content">
         <div class="loading-container">
@@ -1086,13 +1652,13 @@
       <div class="trust-grid">
         <div class="trust-item">
           <div style="font-size: 2rem; margin-bottom: 10px">🇺🇸</div>
-          <h4>USA Warehouse</h4>
-          <p>Fast delivery within 3-5 days.</p>
+          <h4>Multiple Warehouses</h4>
+          <p>Choose from the warehouse options shown in the live catalog.</p>
         </div>
         <div class="trust-item">
           <div style="font-size: 2rem; margin-bottom: 10px">🚚</div>
           <h4>Free Shipping</h4>
-          <p>On all orders. No hidden fees.</p>
+          <p>Shipping is free on every order.</p>
         </div>
         <div class="trust-item">
           <div style="font-size: 2rem; color: #3498db; margin-bottom: 10px">
@@ -1135,7 +1701,7 @@
       </div>
     </div>
 
-    <div class="bottom-nav-bar">
+    <div id="bottom-nav-bar" class="bottom-nav-bar empty-cart">
       <div class="nav-left" onclick="window.location.href = 'cart.html'">
         <div class="nav-icon-wrap">
           <svg
@@ -1172,8 +1738,10 @@
 
       <div class="nav-right">
         <button
+          id="checkout-pill-btn"
           class="checkout-pill-btn"
-          onclick="window.location.href = 'cart.html'"
+          onclick="sendOrderToWhatsApp()"
+          disabled
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -1191,14 +1759,21 @@
       </div>
     </div>
 
+    <button
+      id="back-to-top-btn"
+      class="back-to-top-btn"
+      type="button"
+      aria-label="Back to top"
+      onclick="scrollToPageTop()"
+    >
+      TOP
+    </button>
+
     <div id="toast">Added to Cart! 🛒</div>
 
     <div id="modal" class="modal">
       <div class="modal-content">
-        <div
-          class="modal-close"
-          onclick="document.getElementById('modal').classList.remove('open')"
-        >
+        <div class="modal-close" onclick="closeProductModal()">
           &times;
         </div>
         <img id="modal-img" class="modal-img" src="" />
@@ -1222,7 +1797,42 @@
             "
           ></div>
           <div id="modal-action-area"></div>
+          <button
+            type="button"
+            class="modal-back-btn"
+            onclick="closeProductModal()"
+          >
+            Back
+          </button>
         </div>
+      </div>
+    </div>
+
+    <div id="warehouse-choice-modal" class="modal" aria-hidden="true">
+      <div class="modal-content warehouse-choice-content">
+        <button
+          type="button"
+          class="modal-close"
+          aria-label="Close warehouse selection"
+          onclick="closeWarehouseChoice()"
+        >
+          &times;
+        </button>
+        <p class="warehouse-choice-eyebrow">Choose fulfillment warehouse</p>
+        <h3 id="warehouse-choice-title" class="warehouse-choice-title"></h3>
+        <p id="warehouse-choice-copy" class="warehouse-choice-copy"></p>
+        <div
+          id="warehouse-choice-options"
+          class="warehouse-choice-options"
+        ></div>
+        <button
+          id="warehouse-choice-confirm"
+          type="button"
+          class="warehouse-choice-confirm"
+          onclick="confirmWarehouseChoice()"
+        >
+          Add to Cart
+        </button>
       </div>
     </div>
 
@@ -1253,199 +1863,59 @@
       </div>
     </div>
 
-    <div id="tracking-modal" class="modal">
-      <div
-        class="modal-content"
-        style="max-width: 360px; text-align: center; padding: 25px"
-      >
-        <div class="modal-close" onclick="closeTrackingModal()">&times;</div>
-
-        <h3 style="margin: 0 0 10px 0; font-size: 1.2rem">TRACK YOUR ORDER</h3>
-        <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px">
-          Enter your <b>Phone Number</b> or <b>Name</b> to retrieve your
-          tracking info.
-        </p>
-
-        <input
-          type="text"
-          id="track-input"
-          class="header-search-input"
-          style="
-            background: #fff;
-            border: 1px solid #ccc;
-            color: #333;
-            margin-bottom: 15px;
-            text-align: center;
-          "
-          placeholder="e.g. 1234567890 or Jackson"
-        />
-
-        <button
-          id="track-btn"
-          class="action-btn-black"
-          onclick="performTracking()"
-        >
-          CHECK NOW
-        </button>
-
-        <div
-          id="track-result"
-          style="
-            margin-top: 20px;
-            display: none;
-            text-align: left;
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-          "
-        ></div>
-      </div>
-    </div>
-
-    <script src="db.js"></script>
+    <script src="db.js?v=12"></script>
     <script>
-      // ================= Tracking & Checkout Logic =================
-      const GOOGLE_SCRIPT_URL =
-        "https://script.google.com/macros/s/AKfycbyTu1LHtseu7j_v40r9Sp2ZbqLZ3ZrlWexqVUjjQhouK6zZPxnBLwaCL9LAbawLIFI/exec";
-
-      function openTrackingModal() {
-        document.getElementById("sidebar").classList.remove("active");
-        document.getElementById("sidebar-overlay").classList.remove("active");
-        document.getElementById("tracking-modal").classList.add("open");
-      }
-
-      function closeTrackingModal() {
-        document.getElementById("tracking-modal").classList.remove("open");
-        document.getElementById("track-result").style.display = "none";
-        document.getElementById("track-input").value = "";
-      }
-
-      // 辅助函数：根据快递公司生成查询链接
-      function getTrackingUrl(carrier, num) {
-        if (!carrier) return "https://t.17track.net/en#nums=" + num;
-        let c = carrier.toLowerCase();
-        if (c.includes("ups"))
-          return `https://www.ups.com/track?tracknum=${num}`;
-        if (c.includes("usps"))
-          return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${num}`;
-        if (c.includes("fedex"))
-          return `https://www.fedex.com/fedextrack/?trknbr=${num}`;
-        // GOFO Express 或其他未识别的，全部走 17TRACK
-        return `https://t.17track.net/en#nums=${num}`;
-      }
-
-      function performTracking() {
-        const input = document.getElementById("track-input").value.trim();
-        const btn = document.getElementById("track-btn");
-        const resultDiv = document.getElementById("track-result");
-
-        if (!input) return alert("Please enter a name or phone number.");
-
-        // UI Loading State
-        btn.textContent = "SEARCHING...";
-        btn.disabled = true;
-        resultDiv.style.display = "none";
-
-        // 发起请求
-        fetch(`${GOOGLE_SCRIPT_URL}?q=${encodeURIComponent(input)}`)
-          .then((response) => response.json())
-          .then((data) => {
-            btn.textContent = "CHECK NOW";
-            btn.disabled = false;
-            resultDiv.style.display = "block";
-
-            if (data.status === "success") {
-              // 处理多单号：按换行符或空格分割
-              let rawTracks = String(data.tracking).split(/[\n\s]+/);
-
-              // 生成每一个单号的 HTML
-              let trackHtml = rawTracks
-                .map((num) => {
-                  if (num.length < 5) return ""; // 过滤无效短字符
-
-                  // 获取跳转链接
-                  let trackLink = getTrackingUrl(data.carrier, num);
-
-                  // 核心修改 1：移除 alert，改为触发无弹窗的 Toast 提示
-                  return `
-                    <div style="background:#fff; border:1px dashed #ccc; border-radius:4px; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; flex-direction:column; gap:4px;">
-                           <span style="font-family:monospace; font-weight:bold; font-size:0.95rem; word-break:break-all;">${num}</span>
-                           <a href="${trackLink}" target="_blank" style="font-size:0.75rem; color:#007bff; text-decoration:none; font-weight:bold; display:flex; align-items:center; gap:3px;">
-                              🌐 TRACK
-                           </a>
-                        </div>
-                        <span onclick="navigator.clipboard.writeText('${num}').then(()=>showToast('Tracking Number Copied!'))" style="cursor:pointer; font-size:1.2rem; padding:5px;" title="Copy">📋</span>
-                    </div>
-                  `;
-                })
-                .join("");
-
-              // 渲染结果
-              resultDiv.innerHTML = `
-                <div style="color:#28a745; font-weight:bold; margin-bottom:5px; font-size:1.1rem;">✅ Order Found!</div>
-                
-                <div style="background:#eee; height:1px; margin:10px 0;"></div>
-                
-                <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#555; margin-bottom:10px;">
-                    <span>📅 Date: <b>${data.order_date || "N/A"}</b></span>
-                    <span>👤 <b>${data.customer_name}</b></span>
-                </div>
-
-                <div style="font-size:0.9rem; color:#333; margin-bottom:8px;">
-                    Carrier: <b>${data.carrier}</b>
-                </div>
-
-                <div style="text-align:left;">
-                    ${trackHtml}
-                </div>
-                
-                <div style="font-size:0.75rem; color:#999; margin-top:5px; text-align:center;">
-                    *Click icon to copy number
-                </div>
-              `;
-            } else {
-              // 没找到
-              resultDiv.innerHTML = `
-                <div style="color:#d9534f; font-weight:bold;">❌ Order Not Found</div>
-                <p style="font-size:0.85rem; color:#666; margin-top:5px;">
-                  We couldn't find an order with that info. Please try your <b>Phone Number (digits only)</b> or check if the order has been shipped yet.
-                </p>
-              `;
-            }
-          })
-          .catch((error) => {
-            console.error("Error:", error);
-            btn.textContent = "CHECK NOW";
-            btn.disabled = false;
-            alert("System Error. Please try again later.");
-          });
-      }
+      // ================= Catalog & Checkout Logic =================
+      const WHATSAPP_NUMBER = "16232027321";
 
       // ... (Rest of existing JS functions: loadCart, saveCart, updateWholesaleBanner, etc.)
       const FEATURED_BRANDS = [
-        "Creed",
-        "Dior",
-        "Chanel",
         "Tom Ford",
-        "Yves Saint Laurent",
-        "Louis Vuitton",
+        "Chanel",
         "Gucci",
-        "Carolina Herrera",
         "Valentino",
-        "Maison Francis Kurkdjian",
-        "Parfums de Marly",
-        "Jean Paul Gaultier",
-        "Xerjoff",
-        "Bond No. 9",
-        "Initio",
+        "Lancôme",
+        "Yves Saint Laurent",
         "Paco Rabanne",
-        "Giorgio Armani",
-        "Burberry",
+        "Creed",
+        "Jean Paul Gaultier",
+        "Maison Francis Kurkdjian",
+        "Dior",
         "Versace",
+        "Giorgio Armani",
+        "Prada",
+        "Xerjoff",
+        "Louis Vuitton",
+        "Carolina Herrera",
+        "Burberry",
+        "Initio",
+        "Ralph Lauren",
+        "Parfums de Marly",
+        "Le Labo",
+        "Amouage",
+        "Givenchy",
+        "Kayali",
+        "Kilian",
+        "Azzaro",
+        "Byredo",
+        "Hugo Boss",
+        "Dolce & Gabbana",
+        "Mugler",
+        "Xerjoff Casamorati",
+        "Victoria's Secret",
+        "Bond No. 9",
+        "Penhaligon's",
+        "Marc Jacobs",
+        "Armaf",
+        "Jo Malone",
+        "Viktor&Rolf",
+        "Hermès",
+        "Bvlgari",
+        "Moschino",
       ];
-      const FEATURED_BRANDS_LOWER = FEATURED_BRANDS.map((b) => b.toLowerCase());
+      const FEATURED_BRANDS_LOWER = FEATURED_BRANDS.map((brand) =>
+        normalizeSearchText(brand),
+      );
       const discountTiers = [
         { min: 1, max: 1, percent: 0 },
         { min: 2, max: 2, percent: 0.03 },
@@ -1458,37 +1928,317 @@
         { min: 80, max: 100, percent: 0.32 },
         { min: 101, max: Infinity, percent: 0.35 },
       ];
+      const MIN_DISPLAY_STOCK = 1;
+      const MOBILE_BRAND_LIMIT = 10;
+      const DEFAULT_PRODUCT_IMAGE =
+        "data:image/svg+xml;charset=UTF-8," +
+        encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720"><rect width="720" height="720" fill="#f3f0e9"/><path d="M310 210h100v56l34 52v164c0 16-13 28-28 28H304c-15 0-28-12-28-28V318l34-52z" fill="none" stroke="#b6ad9d" stroke-width="12"/><text x="360" y="570" text-anchor="middle" fill="#8a8173" font-family="Georgia,serif" font-size="30">Image Pending</text></svg>',
+        );
 
       let cartItems = [];
+      let checkoutChecking = false;
       let currentPage = 1;
       const itemsPerPage = 20;
       let currentGridData = [];
       let viewMode = "home";
-      let currentModalProductId = null;
+      let homeScrollPosition = 0;
+      let currentModalProductRef = null;
+      let activeWarehouseCode = "";
+      let expandedWarehouseCode = "";
+      let pendingWarehouseProductRef = null;
+      let selectedWarehouseCode = null;
+      let recommendedWarehouseCode = null;
+      let warehouseCatalogSource = null;
+      let warehouseCatalogLength = -1;
+      let warehouseCatalogCache = [];
 
       document.addEventListener("DOMContentLoaded", () => {
         loadCart();
         setupMenu();
-        renderSidebarBrands();
+        setupQuickGuide();
+        setupBackToTop();
         setupModalBackdropClosing();
         setupSearch();
 
         const checkDataInterval = setInterval(() => {
           if (window.perfumeDB && window.perfumeDB.length > 0) {
             clearInterval(checkDataInterval);
-            renderHome();
+            const initialView = getInitialViewFromHash();
+            if (initialView) switchToGrid(initialView);
+            else renderHome();
           }
         }, 50);
       });
 
       window.addEventListener("pageshow", function (event) {
         loadCart();
+        if (!window.perfumeDB || window.perfumeDB.length === 0) return;
         if (viewMode === "home") renderHome();
         else renderGridPage();
       });
 
       function getCartTotalQty() {
         return cartItems.reduce((s, i) => s + i.quantity, 0);
+      }
+
+      function normalizeWarehouseCode(value) {
+        return String(value || "")
+          .trim()
+          .toUpperCase()
+          .replace(/\s+WAREHOUSE$/, "")
+          .trim();
+      }
+
+      function getWarehouseCatalog() {
+        const products = window.perfumeDB || [];
+        if (
+          warehouseCatalogSource === products &&
+          warehouseCatalogLength === products.length
+        ) {
+          return warehouseCatalogCache;
+        }
+        const warehouses = new Map();
+        products.forEach((product, index) => {
+          const code = normalizeWarehouseCode(product.warehouse);
+          if (!code) return;
+          if (!warehouses.has(code)) {
+            warehouses.set(code, {
+              code,
+              label: `${code} Warehouse`,
+              firstSeen: index,
+            });
+          }
+        });
+        warehouseCatalogSource = products;
+        warehouseCatalogLength = products.length;
+        warehouseCatalogCache = Array.from(warehouses.values()).sort((a, b) => {
+          if (a.firstSeen !== b.firstSeen) return a.firstSeen - b.firstSeen;
+          return a.code.localeCompare(b.code);
+        });
+        return warehouseCatalogCache;
+      }
+
+      function getWarehouseLabelByCode(value) {
+        const code = normalizeWarehouseCode(value);
+        const warehouse = getWarehouseCatalog().find((item) => item.code === code);
+        return warehouse ? warehouse.label : code ? `${code} Warehouse` : "";
+      }
+
+      function getWarehouseSortIndex(value) {
+        const code = normalizeWarehouseCode(value);
+        const index = getWarehouseCatalog().findIndex((item) => item.code === code);
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+      }
+
+      function ensureActiveWarehouse() {
+        const warehouseCodes = getWarehouseCatalog().map((item) => item.code);
+        if (!warehouseCodes.includes(activeWarehouseCode)) {
+          activeWarehouseCode = warehouseCodes[0] || "";
+        }
+        return activeWarehouseCode;
+      }
+
+      function normalizeSku(value) {
+        return String(value || "").trim().toUpperCase();
+      }
+
+      function getBrandOrderIndex(value) {
+        const normalizedBrand = normalizeSearchText(value);
+        const index = FEATURED_BRANDS_LOWER.indexOf(normalizedBrand);
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+      }
+
+      function compareBrandsByListOrder(a, b) {
+        const rankDifference = getBrandOrderIndex(a) - getBrandOrderIndex(b);
+        return rankDifference || String(a).localeCompare(String(b));
+      }
+
+      function isFeaturedBrand(value) {
+        return FEATURED_BRANDS_LOWER.includes(normalizeSearchText(value));
+      }
+
+      function getProductFamilyKey(product) {
+        const sku = normalizeSku(product && product.id);
+        const warehouseCode = normalizeWarehouseCode(
+          product && product.warehouse,
+        );
+        if (warehouseCode && sku.startsWith(`${warehouseCode}-`)) {
+          return sku.slice(warehouseCode.length + 1);
+        }
+        return sku;
+      }
+
+      function isProductAvailable(product) {
+        return getOrderStockLimit(product) >= MIN_DISPLAY_STOCK;
+      }
+
+      function hasValidPrice(product) {
+        const rawPrice = product ? product.price : "";
+        return rawPrice !== "" && Number.isFinite(Number(rawPrice)) && Number(rawPrice) > 0;
+      }
+
+      function formatProductPrice(product) {
+        const pricedVariant = getProductVariants(product).find(hasValidPrice);
+        return pricedVariant
+          ? `$${Number(pricedVariant.price).toFixed(2)}`
+          : '<span class="price-pending-label">Price Pending</span>';
+      }
+
+      function getProductImage(product) {
+        const imageVariant = getProductVariants(product).find(
+          (variant) => variant && variant.img,
+        );
+        return (imageVariant && imageVariant.img) || DEFAULT_PRODUCT_IMAGE;
+      }
+
+      window.handleProductImageError = function (image) {
+        image.onerror = null;
+        image.parentElement
+          ?.querySelectorAll("source")
+          .forEach((source) => source.remove());
+        image.src = DEFAULT_PRODUCT_IMAGE;
+      };
+
+      function getWarehouseLabel(product) {
+        const code = normalizeWarehouseCode(product && product.warehouse);
+        return getWarehouseLabelByCode(code);
+      }
+
+      function getProductVariants(product) {
+        if (!product) return [];
+        return Array.isArray(product._variants) && product._variants.length > 0
+          ? product._variants
+          : [product];
+      }
+
+      function getProductWeight(product, fieldName) {
+        const weights = getProductVariants(product)
+          .map((variant) => Number(variant[fieldName]))
+          .filter((weight) => Number.isFinite(weight) && weight > 0);
+        return weights.length > 0 ? Math.min(...weights) : Infinity;
+      }
+
+      function getRankedProducts(products, fieldName) {
+        return groupProductsForDisplay(
+          products.filter((product) => Number(product[fieldName]) > 0),
+          products,
+        ).sort(
+          (a, b) =>
+            getProductWeight(a, fieldName) - getProductWeight(b, fieldName),
+        );
+      }
+
+      function getSelectableWarehouseVariants(product) {
+        const bestByWarehouse = new Map();
+        getProductVariants(product)
+          .filter(isProductAvailable)
+          .forEach((variant) => {
+            const code = normalizeWarehouseCode(variant.warehouse);
+            if (!code) return;
+            const existing = bestByWarehouse.get(code);
+            if (!existing || (!hasValidPrice(existing) && hasValidPrice(variant))) {
+              bestByWarehouse.set(code, variant);
+            }
+          });
+        return Array.from(bestByWarehouse.values()).sort(
+          (a, b) =>
+            getWarehouseSortIndex(a.warehouse) -
+            getWarehouseSortIndex(b.warehouse),
+        );
+      }
+
+      function getProductAvailabilityHtml(product) {
+        const codes = getSelectableWarehouseVariants(product).map((variant) =>
+          normalizeWarehouseCode(variant.warehouse),
+        );
+        if (codes.length > 1) {
+          return `<span class="warehouse-tag multi-warehouse">Available in ${codes.join(" & ")}</span>`;
+        }
+        return `<span class="warehouse-tag">${codes.length ? getWarehouseLabelByCode(codes[0]) : getWarehouseLabel(product)}</span>`;
+      }
+
+      function getProductDisplayTitle(product) {
+        const displayCode =
+          getSelectableWarehouseVariants(product).length > 1
+            ? getProductFamilyKey(product)
+            : String(product.id || "");
+        return [displayCode, product.name]
+          .filter((value) => String(value || "").trim())
+          .join("-");
+      }
+
+      function groupProductsForDisplay(matches, universe) {
+        const productVariants = new Map();
+        (universe || matches).forEach((product) => {
+          const familyKey = getProductFamilyKey(product);
+          if (!familyKey) return;
+          if (!productVariants.has(familyKey)) productVariants.set(familyKey, []);
+          productVariants.get(familyKey).push(product);
+        });
+
+        const seen = new Set();
+        const grouped = [];
+        matches.forEach((product) => {
+          const familyKey = getProductFamilyKey(product);
+          if (!familyKey || seen.has(familyKey)) return;
+          seen.add(familyKey);
+          const variants = productVariants.get(familyKey) || [product];
+          const displayVariant =
+            variants.find(
+              (variant) =>
+                normalizeWarehouseCode(variant.warehouse) ===
+                normalizeWarehouseCode(product.warehouse),
+            ) ||
+            variants.find(hasValidPrice) ||
+            variants[0];
+          grouped.push({
+            ...displayVariant,
+            _variants: variants,
+          });
+        });
+        return grouped;
+      }
+
+      function getProductReference(product) {
+        const familyKey = getProductFamilyKey(product);
+        const variants = getSelectableWarehouseVariants(product);
+        const warehouseCode =
+          variants.length > 1
+            ? "ALL"
+            : normalizeWarehouseCode(product && product.warehouse);
+        return `${familyKey}::${warehouseCode}`;
+      }
+
+      function getRenderableProductByRef(productRef) {
+        const separatorIndex = String(productRef || "").lastIndexOf("::");
+        if (separatorIndex < 0) return null;
+        const familyKey = normalizeSku(
+          String(productRef).slice(0, separatorIndex),
+        );
+        const warehouseCode = normalizeWarehouseCode(
+          String(productRef).slice(separatorIndex + 2),
+        );
+        const matchingProducts = (window.perfumeDB || []).filter(
+          (product) =>
+            getProductFamilyKey(product) === familyKey &&
+            isProductAvailable(product),
+        );
+        if (matchingProducts.length === 0) return null;
+        if (warehouseCode !== "ALL") {
+          return (
+            matchingProducts.find(
+              (product) =>
+                normalizeWarehouseCode(product.warehouse) === warehouseCode,
+            ) || null
+          );
+        }
+        const displayVariant =
+          matchingProducts.find(hasValidPrice) || matchingProducts[0];
+        return {
+          ...displayVariant,
+          _variants: matchingProducts,
+        };
       }
 
       function getStockHtml(inventory) {
@@ -1507,7 +2257,7 @@
         if (banner && content) {
           if (qty === 0) {
             banner.className = "ws-banner";
-            content.innerHTML = `<div class="ws-pill">5+ <span>-8%</span></div><div class="ws-pill">10+ <span>-14%</span></div><div class="ws-pill">20+ <span>-24%</span></div><div class="ws-pill">100+ <span>-35%</span></div>`;
+            content.innerHTML = `<div class="ws-pill">ALL ORDERS <span>FREE SHIPPING</span></div><div class="ws-pill">5+ <span>-8%</span></div><div class="ws-pill">10+ <span>-14%</span></div><div class="ws-pill">20+ <span>-24%</span></div><div class="ws-pill">101+ <span>-35%</span></div>`;
           } else {
             let currentTier =
               discountTiers.find((t) => qty >= t.min && qty <= t.max) ||
@@ -1520,9 +2270,7 @@
 
             let html = `<div class="ws-progress-box">`;
             let currentOff = Math.round(currentTier.percent * 100);
-            // "Free Shipping" removed from top
-
-            html += `<div class="ws-progress-text">Cart: <strong>${qty}</strong> items • Current: <span class="ws-highlight">-${currentOff}% OFF</span></div>`;
+            html += `<div class="ws-progress-text">Cart: <strong>${qty}</strong> items • <span class="ws-highlight">FREE shipping</span> • Current: <span class="ws-highlight">-${currentOff}% OFF</span></div>`;
             if (nextTier) {
               let needMore = nextTier.min - qty;
               let nextOff = Math.round(nextTier.percent * 100);
@@ -1543,6 +2291,16 @@
       function updateBottomBarData(totalQty) {
         // Update Badge
         const badgeEl = document.getElementById("bottom-bar-badge");
+        const checkoutButton = document.getElementById("checkout-pill-btn");
+        const bottomBar = document.getElementById("bottom-nav-bar");
+        if (bottomBar) {
+          bottomBar.classList.toggle("empty-cart", totalQty === 0);
+        }
+        if (checkoutButton) {
+          const isEmpty = totalQty === 0;
+          checkoutButton.disabled = isEmpty || checkoutChecking;
+          checkoutButton.setAttribute("aria-disabled", String(isEmpty || checkoutChecking));
+        }
         if (totalQty > 0) {
           badgeEl.textContent = totalQty;
           badgeEl.style.display = "flex";
@@ -1560,7 +2318,8 @@
           (t) => totalQty >= t.min && totalQty <= t.max,
         );
         const discountPercent = tier ? tier.percent : 0;
-        const finalTotal = subtotal - subtotal * discountPercent;
+        const shipping = getShippingCost(totalQty);
+        const finalTotal = subtotal - subtotal * discountPercent + shipping;
 
         // Update Price Text & Strikethrough
         const priceEl = document.getElementById("bottom-bar-price");
@@ -1571,12 +2330,13 @@
           priceEl.style.color = "#999";
           originalEl.style.display = "none";
         } else {
-          priceEl.textContent = "$" + Math.round(finalTotal);
+          priceEl.textContent = "$" + finalTotal.toFixed(2);
           priceEl.style.color = "#000"; // Big Black Price
 
           // Show Strikethrough if discount > 0
           if (discountPercent > 0) {
-            originalEl.textContent = "~~$" + subtotal.toFixed(0) + "~~";
+            originalEl.textContent =
+              "~~$" + (subtotal + shipping).toFixed(2) + "~~";
             originalEl.style.display = "inline-block";
           } else {
             originalEl.style.display = "none";
@@ -1584,12 +2344,93 @@
         }
       }
 
+      function getCartOrderSummary() {
+        let totalQty = 0;
+        let lvCount = 0;
+        let otherCount = 0;
+        let subtotal = 0;
+
+        cartItems.forEach((item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          totalQty += qty;
+          subtotal += price * qty;
+          if ((item.caption || "").toLowerCase().includes("louis vuitton")) {
+            lvCount += qty;
+          } else {
+            otherCount += qty;
+          }
+        });
+
+        const tier =
+          discountTiers.find((t) => totalQty >= t.min && totalQty <= t.max) ||
+          discountTiers[0];
+        const discountPercent = tier ? tier.percent : 0;
+        const discountAmount = subtotal * discountPercent;
+        const shipping = getShippingCost(totalQty);
+        const finalTotal = subtotal - discountAmount + shipping;
+
+        return {
+          totalQty,
+          lvCount,
+          otherCount,
+          subtotal,
+          discountPercent,
+          discountAmount,
+          shipping,
+          finalTotal,
+        };
+      }
+
+      window.sendOrderToWhatsApp = async function () {
+        if (checkoutChecking) return;
+        loadCart();
+        if (cartItems.length === 0) {
+          showToast("Your cart is empty.");
+          return;
+        }
+        checkoutChecking = true;
+        updateWholesaleBanner();
+        showToast("Checking the latest prices and inventory...");
+        try {
+          const products = await fetchLatestProductData();
+          loadCart();
+          const result = reconcileCart(cartItems, products);
+          if (result.changes.length) {
+            // The cart page explains each change and requires approval.
+            window.location.href = "cart.html";
+            return;
+          }
+          if (!result.items.length) return;
+          cartItems = result.items;
+          saveCart();
+          const msg = buildWhatsAppOrderMessage(cartItems, discountTiers);
+          // Same-tab navigation also works after async checks on mobile browsers.
+          window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+        } catch (error) {
+          showToast("Could not verify current stock. Please try Checkout again.");
+        } finally {
+          checkoutChecking = false;
+          updateWholesaleBanner();
+          refreshProductButtons();
+        }
+      };
+
+      function getProductSizeValue(item) {
+        const variantWithSize = getProductVariants(item).find(
+          (variant) => String(variant?.ml ?? "").trim() !== "",
+        );
+        return variantWithSize ? String(variantWithSize.ml).trim() : "";
+      }
+
       function formatSize(item) {
-        if (!item.ml) return "";
-        if (isNaN(Number(item.ml))) return item.ml;
-        const ml = parseInt(item.ml);
+        const sizeValue = getProductSizeValue(item);
+        if (!sizeValue) return "";
+        if (isNaN(Number(sizeValue))) return sizeValue;
+        const ml = Number(sizeValue);
         const flOz = (ml / 29.57).toFixed(1);
-        return `${ml}ml <span style="color:#999;font-weight:normal">(${flOz} oz)</span>`;
+        const mlLabel = Number.isInteger(ml) ? ml.toFixed(0) : String(ml);
+        return `${mlLabel}ml <span style="color:#999;font-weight:normal">(${flOz} oz)</span>`;
       }
 
       function getGenderClass(genderText) {
@@ -1600,85 +2441,291 @@
         return "unisex";
       }
 
-      function renderSidebarBrands() {
-        const list = document.getElementById("brand-list-container");
-        list.innerHTML = "";
-        FEATURED_BRANDS.forEach((brand) => {
-          const div = document.createElement("div");
-          div.className = "brand-item";
-          div.textContent =
-            brand === "Yves Saint Laurent" ? "YSL" : brand.toUpperCase();
-          div.onclick = () => scrollToBrand(brand);
-          list.appendChild(div);
+      function renderWarehouseMenu() {
+        const container = document.getElementById("warehouse-menu-container");
+        if (!container) return;
+
+        const products = (window.perfumeDB || []).filter(isProductAvailable);
+        if (products.length === 0) {
+          container.innerHTML =
+            '<p class="warehouse-empty">Loading warehouse brands...</p>';
+          container.removeAttribute("data-ready");
+          return;
+        }
+
+        const warehouseCatalog = getWarehouseCatalog().filter((warehouse) =>
+          products.some(
+            (product) =>
+              normalizeWarehouseCode(product.warehouse) === warehouse.code,
+          ),
+        );
+        ensureActiveWarehouse();
+        container.innerHTML = "";
+
+        const tabs = document.createElement("div");
+        tabs.className = "warehouse-tabs";
+
+        warehouseCatalog.forEach(({ code, label }) => {
+          const warehouseProducts = products.filter(
+            (product) => normalizeWarehouseCode(product.warehouse) === code,
+          );
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          const isExpanded = code === expandedWarehouseCode;
+          toggle.className = `warehouse-toggle${isExpanded ? " active" : ""}`;
+          toggle.innerHTML = `<span class="warehouse-toggle-label">${label}</span><span class="warehouse-count">${warehouseProducts.length} items</span>`;
+          toggle.setAttribute(
+            "aria-label",
+            `${label}, ${warehouseProducts.length} products`,
+          );
+          toggle.setAttribute("aria-expanded", String(isExpanded));
+          toggle.onclick = () => {
+            const shouldExpand = expandedWarehouseCode !== code;
+            expandedWarehouseCode = shouldExpand ? code : "";
+            if (shouldExpand) activeWarehouseCode = code;
+            if (viewMode === "home") renderHome();
+            else renderWarehouseMenu();
+          };
+          tabs.appendChild(toggle);
         });
-        const otherDiv = document.createElement("div");
-        otherDiv.className = "brand-item";
-        otherDiv.style.cssText =
-          "font-weight: bold; margin-top: 10px; color: var(--accent-color); border-bottom: none;";
-        otherDiv.textContent = "OTHER BRANDS";
-        otherDiv.onclick = () => scrollToBrand("Other");
-        list.appendChild(otherDiv);
+        container.appendChild(tabs);
+
+        const activeWarehouse = warehouseCatalog.find(
+          (warehouse) => warehouse.code === expandedWarehouseCode,
+        );
+        if (activeWarehouse) {
+          const code = activeWarehouse.code;
+          const warehouseProducts = products.filter(
+            (product) => normalizeWarehouseCode(product.warehouse) === code,
+          );
+          const brands = Array.from(
+            new Set(
+              warehouseProducts
+                .map((product) => String(product.brand || "").trim())
+                .filter(Boolean),
+            ),
+          ).sort(compareBrandsByListOrder);
+          const brandList = document.createElement("div");
+          brandList.className = "warehouse-brand-list";
+
+          const allButton = document.createElement("button");
+          allButton.type = "button";
+          allButton.className = "warehouse-brand-item all-products";
+          allButton.textContent = `All ${code} products`;
+          allButton.onclick = () => switchToGrid(`Warehouse:${code}`);
+          brandList.appendChild(allButton);
+
+          if (brands.length > 0) {
+            brands.forEach((brand, index) => {
+              const button = document.createElement("button");
+              button.type = "button";
+              const isLastOddBrand =
+                brands.length <= MOBILE_BRAND_LIMIT &&
+                brands.length % 2 === 1 &&
+                index === brands.length - 1;
+              button.className = `warehouse-brand-item${index >= MOBILE_BRAND_LIMIT ? " mobile-extra-brand" : ""}${isLastOddBrand ? " mobile-last-brand" : ""}`;
+              button.textContent = brand;
+              button.onclick = () =>
+                switchToGrid(
+                  `WarehouseBrand:${code}:${encodeURIComponent(brand)}`,
+                );
+              brandList.appendChild(button);
+            });
+
+            if (brands.length > MOBILE_BRAND_LIMIT) {
+              const moreButton = document.createElement("button");
+              moreButton.type = "button";
+              moreButton.className = "warehouse-brand-more";
+              moreButton.setAttribute("aria-expanded", "false");
+              moreButton.textContent = `Show ${brands.length - MOBILE_BRAND_LIMIT} more brands`;
+              moreButton.onclick = () => {
+                const showAll = brandList.classList.toggle("show-all-brands");
+                moreButton.setAttribute("aria-expanded", String(showAll));
+                moreButton.textContent = showAll
+                  ? "Show fewer brands"
+                  : `Show ${brands.length - MOBILE_BRAND_LIMIT} more brands`;
+              };
+              brandList.appendChild(moreButton);
+            }
+          } else {
+            const empty = document.createElement("p");
+            empty.className = "warehouse-empty";
+            empty.textContent = `${code} products are coming soon.`;
+            brandList.appendChild(empty);
+          }
+          container.appendChild(brandList);
+        }
+        container.dataset.ready = "true";
       }
+
+      function setupQuickGuide() {
+        renderWarehouseMenu();
+      }
+
+      function updateBackToTopVisibility() {
+        const btn = document.getElementById("back-to-top-btn");
+        if (!btn) return;
+        btn.classList.toggle("visible", window.scrollY > 650);
+      }
+
+      function setupBackToTop() {
+        updateBackToTopVisibility();
+        window.addEventListener("scroll", updateBackToTopVisibility, {
+          passive: true,
+        });
+      }
+
+      window.scrollToPageTop = function () {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
 
       function generatePictureHTML(src, alt) {
-        const webpSrc = src.replace(/\.(jpg|png|jpeg)$/i, ".webp");
-        return `<div class="img-wrapper skeleton-loader"><picture><source srcset="${webpSrc}" type="image/webp"><img src="${src}" alt="${alt}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture></div>`;
+        const imageSrc = src || DEFAULT_PRODUCT_IMAGE;
+        const webpSrc = imageSrc.replace(/\.(jpg|png|jpeg)$/i, ".webp");
+        return `<div class="img-wrapper skeleton-loader"><picture><source srcset="${webpSrc}" type="image/webp"><img src="${imageSrc}" alt="${alt}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="handleProductImageError(this); this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture></div>`;
       }
 
-      function getCartQty(id) {
-        const item = cartItems.find((c) => c.name === id);
-        return item ? item.quantity : 0;
+      function getCartItemsForProduct(product) {
+        const variantKeys = new Set(
+          getProductVariants(product).map(
+            (variant) =>
+              `${normalizeSku(variant.id)}::${normalizeWarehouseCode(variant.warehouse)}`,
+          ),
+        );
+        return cartItems.filter((item) =>
+          variantKeys.has(
+            `${normalizeSku(item.name)}::${normalizeWarehouseCode(item.warehouse)}`,
+          ),
+        );
       }
 
-      function getAddButtonHtml(id) {
-        const qty = getCartQty(id);
-        if (qty === 0) {
-          // State 0: Large Black Button
-          return `<button class="action-btn-black" onclick="updateItemQty('${id}', 1); event.stopPropagation();">ADD TO CART</button>`;
-        } else {
-          // State >0: Rectangular Control Box
+      function getCartQtyForProduct(product) {
+        return getCartItemsForProduct(product).reduce(
+          (total, item) => total + (Number(item.quantity) || 0),
+          0,
+        );
+      }
+
+      function getDirectCartVariant(product, variants) {
+        const cartMatches = getCartItemsForProduct(product);
+        if (cartMatches.length === 0) return null;
+        const directWarehouseCode =
+          cartMatches.length === 1
+            ? normalizeWarehouseCode(cartMatches[0].warehouse)
+            : getRecommendedWarehouse(variants).code;
+        const variant = variants.find(
+          (item) =>
+            normalizeWarehouseCode(item.warehouse) === directWarehouseCode,
+        );
+        if (!variant) return null;
+        const cartItem = cartMatches.find(
+          (item) =>
+            normalizeWarehouseCode(item.warehouse) === directWarehouseCode,
+        );
+        return {
+          variant,
+          quantity: Number(cartItem?.quantity) || 0,
+          warehouseCode: directWarehouseCode,
+        };
+      }
+
+      function getAddButtonHtml(productRef) {
+        const product = getRenderableProductByRef(productRef);
+        const variants = getSelectableWarehouseVariants(product);
+        if (!variants.some(hasValidPrice)) {
+          return '<div class="price-pending-action">Available after pricing</div>';
+        }
+        const qty = getCartQtyForProduct(product);
+        if (variants.length > 1) {
+          const directCartVariant = getDirectCartVariant(product, variants);
+          if (!directCartVariant) {
+            return `<button class="action-btn-black" onclick="openWarehouseChoiceByRef('${productRef}'); event.stopPropagation();">ADD TO CART</button>`;
+          }
+          const directRef = getProductReference(directCartVariant.variant);
           return `
                 <div class="action-qty-box">
-                    <div class="qty-btn-rect" onclick="updateItemQty('${id}', -1); event.stopPropagation();">-</div>
+                    <div class="qty-btn-rect" onclick="updateItemQty('${directRef}', -1); event.stopPropagation();">-</div>
+                    <button type="button" class="qty-val-rect qty-warehouse-switch" aria-label="Change warehouse. Currently ${directCartVariant.warehouseCode}" onclick="openWarehouseChoiceByRef('${productRef}'); event.stopPropagation();">
+                      <span>${directCartVariant.quantity || qty}</span>
+                      <span class="qty-warehouse-code">${directCartVariant.warehouseCode}</span>
+                    </button>
+                    <div class="qty-btn-rect" onclick="updateItemQty('${directRef}', 1); event.stopPropagation();">+</div>
+                </div>`;
+        }
+        if (qty === 0) {
+          return `<button class="action-btn-black" onclick="updateItemQty('${productRef}', 1); event.stopPropagation();">ADD TO CART</button>`;
+        } else {
+          return `
+                <div class="action-qty-box">
+                    <div class="qty-btn-rect" onclick="updateItemQty('${productRef}', -1); event.stopPropagation();">-</div>
                     <div class="qty-val-rect">${qty}</div>
-                    <div class="qty-btn-rect" onclick="updateItemQty('${id}', 1); event.stopPropagation();">+</div>
+                    <div class="qty-btn-rect" onclick="updateItemQty('${productRef}', 1); event.stopPropagation();">+</div>
                 </div>`;
         }
       }
 
       // --- Home Render Logic ---
       function renderHome() {
+        ensureActiveWarehouse();
+        const allAvailableProducts = (window.perfumeDB || []).filter(
+          isProductAvailable,
+        );
         const db = (window.perfumeDB || []).filter(
-          (p) => parseInt(p.stock) > 0,
+          (product) =>
+            isProductAvailable(product) &&
+            normalizeWarehouseCode(product.warehouse) === activeWarehouseCode,
         );
         const container = document.getElementById("home-content");
         if (!container) return;
         container.innerHTML = "";
+        renderWarehouseMenu();
+
+        const hotSellingItems = getRankedProducts(
+          allAvailableProducts,
+          "hot_selling_weight",
+        );
+        if (hotSellingItems.length > 0) {
+          const hotSellingSection = createBrandSection(
+            "Hot Selling",
+            hotSellingItems,
+            "HotSelling",
+          );
+          hotSellingSection.id = "home-hot-selling";
+          container.appendChild(hotSellingSection);
+        }
+
+        const newArrivalItems = getRankedProducts(
+          allAvailableProducts,
+          "new_arrival_weight",
+        );
+        if (newArrivalItems.length > 0) {
+          const newArrivalSection = createBrandSection(
+            "New Arrivals",
+            newArrivalItems,
+            "NewArrival",
+          );
+          newArrivalSection.id = "home-new-arrivals";
+          container.appendChild(newArrivalSection);
+        }
+
+        const getWarehouseCriteria = (filterKey) => {
+          if (filterKey === "Other") return `WarehouseOther:${activeWarehouseCode}`;
+          if (filterKey === "Sale") return `WarehouseSale:${activeWarehouseCode}`;
+          if (filterKey === "Set") return `WarehouseSet:${activeWarehouseCode}`;
+          return `WarehouseBrand:${activeWarehouseCode}:${encodeURIComponent(filterKey)}`;
+        };
 
         const renderSection = (title, items, filterKey) => {
-          const section = createBrandSection(title, items, filterKey);
-          if (
-            filterKey &&
-            !["BestSellers", "New", "Sale"].includes(filterKey)
-          ) {
+          const section = createBrandSection(
+            title,
+            items,
+            getWarehouseCriteria(filterKey),
+          );
+          if (filterKey && !["Sale"].includes(filterKey)) {
             section.id = "brand-" + filterKey.replace(/\s+/g, "");
           }
           container.appendChild(section);
         };
-
-        // 【核心修改】：加入基于数字从小到大的精准排序能力
-        const bestSellers = db
-          .filter((p) => Number(p.top) > 0)
-          .sort((a, b) => Number(a.top) - Number(b.top));
-        if (bestSellers.length > 0)
-          renderSection("🔥 Best Sellers", bestSellers, "BestSellers");
-
-        // 【核心修改】：加入基于数字从小到大的精准排序能力
-        const newArrivals = db
-          .filter((p) => Number(p.new) > 0)
-          .sort((a, b) => Number(a.new) - Number(b.new));
-        if (newArrivals.length > 0)
-          renderSection("🆕 New Arrivals", newArrivals, "New");
 
         const renderedBrands = new Set();
         FEATURED_BRANDS.forEach((brand) => {
@@ -1705,7 +2752,7 @@
           const otherSection = createBrandSection(
             "Other Brands",
             otherProducts,
-            "Other",
+            `WarehouseOther:${activeWarehouseCode}`,
           );
           otherSection.id = "brand-Other";
           container.appendChild(otherSection);
@@ -1718,20 +2765,31 @@
         if (saleItems.length > 0)
           renderSection("🏷️ On Sale", saleItems, "Sale");
 
-        const setItems = db.filter((p) => p.name.toUpperCase().includes("SET"));
+        const setItems = db.filter(isGiftSetProduct);
         if (setItems.length > 0) renderSection("🎁 Gift Sets", setItems, "Set");
 
         const shopAllContainer = document.createElement("div");
         shopAllContainer.className = "shop-all-section";
-        shopAllContainer.innerHTML = `<button class="shop-all-btn" onclick="handleMenuClick('All')">Shop All Products</button>`;
+        shopAllContainer.innerHTML = `<p class="shop-all-copy">Prefer to browse the complete catalog?</p><button class="shop-all-btn" onclick="handleMenuClick('All')">Shop All Products</button>`;
         container.appendChild(shopAllContainer);
+      }
+
+      function isGiftSetProduct(product) {
+        const id = getProductFamilyKey(product);
+        const name = String(product.name || "").toUpperCase();
+        const size = String(getProductSizeValue(product)).toUpperCase();
+        return (
+          id === "A282" ||
+          name.includes("SET") ||
+          name.includes("GIFT BOX") ||
+          size.includes("30ML X 4")
+        );
       }
 
       function createBrandSection(title, products, filterKey) {
         const section = document.createElement("div");
         section.className = "brand-section";
-        const cleanFilterKey =
-          filterKey || (title.includes("Best") ? "BestSellers" : "All");
+        const cleanFilterKey = filterKey || "All";
 
         const header = document.createElement("div");
         header.className = "brand-header";
@@ -1762,37 +2820,42 @@
           };
 
           let badgesHtml = "";
-          if (p.top == 1)
+          if (Number.isFinite(getProductWeight(p, "hot_selling_weight")))
             badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
-          if (p.new == 1)
+          if (Number.isFinite(getProductWeight(p, "new_arrival_weight")))
             badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
           if (p.sale == 1)
             badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
 
-          const imgHtml = generatePictureHTML(p.img, p.name);
+          const imgHtml = generatePictureHTML(getProductImage(p), p.name);
           const genderClass = getGenderClass(p.gender);
           const genderHtml = p.gender
             ? `<span class="gender-tag ${genderClass}">${p.gender}</span>`
             : "";
-          const stockHtml = getStockHtml(p.inventory);
+          const stockHtml =
+            getSelectableWarehouseVariants(p).length > 1
+              ? ""
+              : getStockHtml(p.inventory);
+          const productRef = getProductReference(p);
 
           // Use NEW button logic
-          const buttonHtml = getAddButtonHtml(p.id);
+          const buttonHtml = getAddButtonHtml(productRef);
 
           // 核心修改 2：给按钮包裹层统一增加 data-btn-wrap 属性，方便批量更新
           card.innerHTML = `
             <div style="position:relative;">${imgHtml}<div class="badges-container">${badgesHtml}</div></div>
             <div style="padding: 0 5px 5px 5px; display:flex; flex-direction:column; flex:1;">
-                <div class="scroll-card-title">${p.id}-${p.name}</div>
-                <div style="display:flex; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+                <div class="scroll-card-title">${getProductDisplayTitle(p)}</div>
+                <div style="display:flex; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
                     <span style="font-size:0.75rem; color:#666; font-weight:600;">${p.brand}</span>
                     ${genderHtml}
+                    ${getProductAvailabilityHtml(p)}
                 </div>
                 <div class="scroll-card-price">
-                    $${p.price} ${stockHtml}
-                    <span style="font-size:0.75rem; color:#666; font-weight:normal; margin-left:5px;">${p.ml ? formatSize(p) : ""}</span>
+                    ${formatProductPrice(p)} ${stockHtml}
+                    <span style="font-size:0.75rem; color:#666; font-weight:normal; margin-left:5px;">${formatSize(p)}</span>
                 </div>
-                <div class="btn-qty-wrapper" data-btn-wrap="${p.id}">${buttonHtml}</div>
+                <div class="btn-qty-wrapper" data-btn-wrap="${productRef}">${buttonHtml}</div>
             </div>
           `;
           wrapper.appendChild(card);
@@ -1862,68 +2925,178 @@
         bond: "Bond No. 9",
         "bond no 9": "Bond No. 9",
         jpg: "JEAN PAUL GAULTIER",
+        prada: "Prada",
+        byredo: "Byredo",
+        amouage: "Amouage",
+        dolce: "Dolce & Gabbana",
+        gabbana: "Dolce & Gabbana",
+        ralph: "Ralph Lauren",
+        "ralph lauren": "Ralph Lauren",
+        "dolce gabbana": "Dolce & Gabbana",
+        "dolce and gabbana": "Dolce & Gabbana",
+        "d&g": "Dolce & Gabbana",
+        viktor: "Viktor & Rolf",
+        rolf: "Viktor & Rolf",
+        "viktor rolf": "Viktor & Rolf",
+        "viktor and rolf": "Viktor & Rolf",
+        "viktor & rolf": "Viktor & Rolf",
       };
+      const SEARCH_STOPWORDS = new Set([
+        "a",
+        "an",
+        "and",
+        "de",
+        "el",
+        "for",
+        "la",
+        "le",
+        "of",
+        "the",
+      ]);
 
+      function normalizeSearchText(text) {
+        return (text || "")
+          .toString()
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/(\d+(?:[.,]\d+)?)\s*(?:milliliters?|millilitres?|ml)\b/g,
+            (_, size) => `${size.replace(",", ".")}ml`)
+          .replace(/&/g, " and ")
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim()
+          .replace(/\s+/g, " ");
+      }
+
+      function getBrandSearchMatch(rawTerm) {
+        const term = ` ${normalizeSearchText(rawTerm)} `;
+        const candidates = [
+          ...Object.entries(BRAND_ALIASES),
+          ...FEATURED_BRANDS.map((brand) => [brand, brand]),
+          ...(window.perfumeDB || []).map((p) => [p.brand, p.brand]),
+        ].map(([alias, brand]) => ({ alias: normalizeSearchText(alias), brand }))
+          .filter((entry) => entry.alias)
+          .sort((a, b) => b.alias.length - a.alias.length);
+        return candidates.find((entry) => term.includes(` ${entry.alias} `)) || null;
+      }
       function detectBrandIntent(rawTerm) {
-        const lowerTerm = rawTerm.toLowerCase().trim();
-        const tokens = lowerTerm.split(/\s+/);
-        for (const [key, brandName] of Object.entries(BRAND_ALIASES)) {
-          if (lowerTerm.includes(key)) return brandName;
-        }
-        for (const token of tokens) {
-          if (BRAND_ALIASES[token]) return BRAND_ALIASES[token];
-        }
-        return null;
+        return getBrandSearchMatch(rawTerm)?.brand || null;
       }
       function normalizeAndTokenize(rawTerm) {
-        return rawTerm
-          .toLowerCase()
-          .trim()
+        return normalizeSearchText(rawTerm)
           .split(/\s+/)
-          .filter((t) => t.length > 0);
+          .filter((t) => t.length > 0 && !SEARCH_STOPWORDS.has(t));
       }
       function calculateRelevanceScore(product, searchTokens) {
         let score = 0;
-        const pId = (product.id || "").toString().toLowerCase();
-        const pName = (product.name || "").toLowerCase();
-        const pBrand = (product.brand || "").toLowerCase();
+        const pId = normalizeSearchText(product.id);
+        const pName = normalizeSearchText(product.name);
+        const pBrand = normalizeSearchText(product.brand);
+        const pSize = normalizeSearchText(formatOrderSize(product.ml));
         searchTokens.forEach((token) => {
           if (token.length < 1) return;
           if (pId.includes(token)) score += 100;
           if (pBrand.includes(token)) score += 60;
           if (pName.includes(token)) score += 50;
+          if (pSize.includes(token)) score += 50;
         });
         return score;
+      }
+      function matchesAllSearchTokens(product, searchTokens) {
+        if (searchTokens.length === 0) return false;
+        const haystack = normalizeSearchText(
+          `${product.id || ""} ${product.brand || ""} ${product.name || ""} ${formatOrderSize(product.ml)}`,
+        );
+        const words = haystack.split(" ");
+        return searchTokens.every((token) =>
+          token.length <= 2 ? words.includes(token) : haystack.includes(token));
+      }
+
+      function searchProducts(products, rawTerm) {
+        const brandMatch = getBrandSearchMatch(rawTerm);
+        const term = normalizeSearchText(rawTerm);
+        const tokens = normalizeAndTokenize(brandMatch
+          ? ` ${term} `.replace(` ${brandMatch.alias} `, " ") : term);
+        return products.filter((p) =>
+          (!brandMatch || normalizeSearchText(p.brand) === normalizeSearchText(brandMatch.brand)) &&
+          (tokens.length ? matchesAllSearchTokens(p, tokens) : Boolean(brandMatch)))
+          .map((product) => ({ product, score: calculateRelevanceScore(product, tokens) }))
+          .sort((a, b) => b.score - a.score)
+          .map((entry) => entry.product);
       }
 
       // --- Grid Render ---
       function switchToGrid(criteria) {
+        if (viewMode === "home") {
+          homeScrollPosition = window.scrollY || window.pageYOffset || 0;
+        }
         viewMode = "grid";
+        setGridNavigationVisible(true);
+        document.getElementById("sidebar").classList.remove("active");
+        document.getElementById("sidebar-overlay").classList.remove("active");
         document.getElementById("home-view").style.display = "none";
         document.getElementById("grid-view").style.display = "block";
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        const db = (window.perfumeDB || []).filter(
-          (p) => parseInt(p.stock) > 0,
-        );
+        const db = (window.perfumeDB || []).filter(isProductAvailable);
         let filtered = [];
         let title = "";
 
-        if (criteria === "All") {
-          filtered = (window.perfumeDB || []).filter(p => parseInt(p.stock) > 0);
-          title = "All Products";
-        } else if (criteria === "BestSellers") {
-          // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
+        if (criteria.startsWith("WarehouseOther:")) {
+          const warehouseCode = normalizeWarehouseCode(criteria.split(":")[1]);
+          filtered = db.filter((product) => {
+            const productBrand = String(product.brand || "").toLowerCase();
+            return (
+              normalizeWarehouseCode(product.warehouse) === warehouseCode &&
+              productBrand &&
+              !isFeaturedBrand(productBrand)
+            );
+          });
+          title = `${getWarehouseLabelByCode(warehouseCode)} · Other Brands`;
+        } else if (criteria.startsWith("WarehouseSale:")) {
+          const warehouseCode = normalizeWarehouseCode(criteria.split(":")[1]);
           filtered = db
-            .filter((p) => Number(p.top) > 0)
-            .sort((a, b) => Number(a.top) - Number(b.top));
-          title = "Best Sellers";
-        } else if (criteria === "New") {
-          // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
-          filtered = db
-            .filter((p) => Number(p.new) > 0)
-            .sort((a, b) => Number(a.new) - Number(b.new));
+            .filter(
+              (product) =>
+                normalizeWarehouseCode(product.warehouse) === warehouseCode &&
+                Number(product.sale) > 0,
+            )
+            .sort((a, b) => Number(a.sale) - Number(b.sale));
+          title = `${getWarehouseLabelByCode(warehouseCode)} · On Sale`;
+        } else if (criteria.startsWith("WarehouseSet:")) {
+          const warehouseCode = normalizeWarehouseCode(criteria.split(":")[1]);
+          filtered = db.filter(
+            (product) =>
+              normalizeWarehouseCode(product.warehouse) === warehouseCode &&
+              isGiftSetProduct(product),
+          );
+          title = `${getWarehouseLabelByCode(warehouseCode)} · Gift Sets`;
+        } else if (criteria.startsWith("WarehouseBrand:")) {
+          const parts = criteria.split(":");
+          const warehouseCode = normalizeWarehouseCode(parts[1]);
+          const brand = decodeURIComponent(parts.slice(2).join(":"));
+          filtered = db.filter(
+            (product) =>
+              normalizeWarehouseCode(product.warehouse) === warehouseCode &&
+              normalizeSearchText(product.brand) === normalizeSearchText(brand),
+          );
+          title = `${getWarehouseLabelByCode(warehouseCode)} · ${brand}`;
+        } else if (criteria.startsWith("Warehouse:")) {
+          const warehouseCode = normalizeWarehouseCode(criteria.split(":")[1]);
+          filtered = db.filter(
+            (product) =>
+              normalizeWarehouseCode(product.warehouse) === warehouseCode,
+          );
+          title = `${getWarehouseLabelByCode(warehouseCode)} Products`;
+        } else if (criteria === "HotSelling") {
+          filtered = getRankedProducts(db, "hot_selling_weight");
+          title = "Hot Selling";
+        } else if (criteria === "NewArrival") {
+          filtered = getRankedProducts(db, "new_arrival_weight");
           title = "New Arrivals";
+        } else if (criteria === "All") {
+          filtered = groupProductsForDisplay(db, db);
+          title = "All Products";
         } else if (criteria === "Sale") {
           // 【核心修改】：点击 See All 进入全屏时也按照数字从小到大排序
           filtered = db
@@ -1931,7 +3104,7 @@
             .sort((a, b) => Number(a.sale) - Number(b.sale));
           title = "On Sale";
         } else if (criteria === "Set") {
-          filtered = db.filter((p) => p.name.toUpperCase().includes("SET"));
+          filtered = db.filter(isGiftSetProduct);
           title = "Gift Sets Collection";
         } else if (criteria.startsWith("Gender:")) {
           const targetGender = criteria.split(":")[1];
@@ -1948,48 +3121,13 @@
                 : "Unisex Collection";
         } else if (criteria.startsWith("Search:")) {
           const rawTerm = criteria.replace("Search:", "").trim();
-          const targetBrand = detectBrandIntent(rawTerm);
-          const searchTokens = normalizeAndTokenize(rawTerm);
-          if (targetBrand) {
-            let brandProducts = db.filter(
-              (p) => p.brand.toLowerCase() === targetBrand.toLowerCase(),
-            );
-            let remainingTokens = searchTokens.filter(
-              (t) =>
-                !Object.keys(BRAND_ALIASES).some(
-                  (k) =>
-                    BRAND_ALIASES[k] === targetBrand &&
-                    (k.includes(t) || t.includes(k)),
-                ),
-            );
-            if (remainingTokens.length > 0) {
-              let scored = brandProducts
-                .map((p) => ({
-                  product: p,
-                  score: calculateRelevanceScore(p, remainingTokens),
-                }))
-                .filter((item) => item.score > 0);
-              scored.sort((a, b) => b.score - a.score);
-              filtered = scored.map((item) => item.product);
-            } else {
-              filtered = brandProducts;
-            }
-            title = `Brand Results: "${targetBrand}"`;
-          } else {
-            let scoredProducts = db
-              .map((p) => ({
-                product: p,
-                score: calculateRelevanceScore(p, searchTokens),
-              }))
-              .filter((item) => item.score > 0);
-            scoredProducts.sort((a, b) => b.score - a.score);
-            filtered = scoredProducts.map((item) => item.product);
-            title = `Results: "${rawTerm}"`;
-          }
+          filtered = searchProducts(db, rawTerm);
+          title = `Results: "${rawTerm}"`;
+          filtered = groupProductsForDisplay(filtered, db);
         } else if (criteria === "Other") {
           filtered = db.filter((p) => {
-            const pBrandLower = p.brand ? p.brand.toLowerCase() : "";
-            return pBrandLower && !FEATURED_BRANDS_LOWER.includes(pBrandLower);
+            const pBrand = p.brand ? String(p.brand) : "";
+            return pBrand && !isFeaturedBrand(pBrand);
           });
           title = "More Brands";
         } else {
@@ -2021,33 +3159,38 @@
           const div = document.createElement("div");
           div.className = "item";
           let badgesHtml = "";
-          if (p.top == 1)
+          if (Number.isFinite(getProductWeight(p, "hot_selling_weight")))
             badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
-          if (p.new == 1)
+          if (Number.isFinite(getProductWeight(p, "new_arrival_weight")))
             badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
           if (p.sale == 1)
             badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
-          const webpSrc = p.img.replace(/\.(jpg|png|jpeg)$/i, ".webp");
+          const imageSrc = getProductImage(p);
+          const webpSrc = imageSrc.replace(/\.(jpg|png|jpeg)$/i, ".webp");
           const genderClass = getGenderClass(p.gender);
           const genderText = p.gender
             ? ` · <span class="gender-tag ${genderClass}">${p.gender}</span>`
             : "";
-          const stockHtml = getStockHtml(p.inventory);
+          const stockHtml =
+            getSelectableWarehouseVariants(p).length > 1
+              ? ""
+              : getStockHtml(p.inventory);
+          const productRef = getProductReference(p);
 
           // Use NEW button logic
-          const buttonHtml = getAddButtonHtml(p.id);
+          const buttonHtml = getAddButtonHtml(productRef);
 
           // 核心修改 2：给按钮包裹层统一增加 data-btn-wrap 属性
           div.innerHTML = `
-              <div class="item-img-box skeleton-loader" onclick="openModalById('${p.id}')">
-                  <picture><source srcset="${webpSrc}" type="image/webp"><img src="${p.img}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture>
+              <div class="item-img-box skeleton-loader" onclick="openModalByRef('${productRef}')">
+                  <picture><source srcset="${webpSrc}" type="image/webp"><img src="${imageSrc}" loading="lazy" class="lazy-img" onload="this.classList.add('loaded'); this.parentElement.parentElement.classList.remove('skeleton-loader');" onerror="handleProductImageError(this); this.parentElement.parentElement.classList.remove('skeleton-loader');"></picture>
                   <div class="badges-container">${badgesHtml}</div>
               </div>
               <div class="caption">
-                 <div style="font-size:0.85rem; height:2.4em; overflow:hidden; margin-bottom:5px; line-height:1.2;">${p.id}-${p.name}</div>
-                 <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">${p.brand}${genderText} <br> ${formatSize(p)}</div>
-                 <div class="item-price">$${p.price} ${stockHtml}</div>
-                 <div class="btn-qty-wrapper" data-btn-wrap="${p.id}">${buttonHtml}</div>
+                 <div style="font-size:0.85rem; height:2.4em; overflow:hidden; margin-bottom:5px; line-height:1.2;">${getProductDisplayTitle(p)}</div>
+                 <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">${p.brand}${genderText} ${getProductAvailabilityHtml(p)}<br>${formatSize(p)}</div>
+                 <div class="item-price">${formatProductPrice(p)} ${stockHtml}</div>
+                 <div class="btn-qty-wrapper" data-btn-wrap="${productRef}">${buttonHtml}</div>
               </div>
            `;
           gallery.appendChild(div);
@@ -2115,10 +3258,10 @@
       }
 
       window.openModal = function (product) {
-        currentModalProductId = product.id;
-        document.getElementById("modal-img").src = product.img;
+        currentModalProductRef = getProductReference(product);
+        document.getElementById("modal-img").src = getProductImage(product);
         document.getElementById("modal-title").textContent =
-          `${product.id}-${product.name}`;
+          getProductDisplayTitle(product);
         const notesContent = product.Notes || product.notes;
         let notesHtml = "";
         if (notesContent && notesContent.trim() !== "") {
@@ -2126,10 +3269,13 @@
         }
         const genderClass = getGenderClass(product.gender);
         document.getElementById("modal-sub").innerHTML =
-          `<div style="font-size:1.1rem; color:#333; margin-bottom:5px;">${product.brand}</div><div style="margin-bottom:8px; font-size:0.85rem; color:#555; display:flex; align-items:center; justify-content:center;"><span class="gender-tag ${genderClass}" style="font-size:0.8rem; margin:0 5px 0 0;">${product.gender || "Unisex"}</span><span style="color:#ccc">|</span> <span style="margin-left:5px">${formatSize(product)}</span></div>${notesHtml}`;
+          `<div style="font-size:1.1rem; color:#333; margin-bottom:5px;">${product.brand}</div><div style="margin-bottom:8px; font-size:0.85rem; color:#555; display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;"><span class="gender-tag ${genderClass}" style="font-size:0.8rem; margin:0;">${product.gender || "Unisex"}</span>${getProductAvailabilityHtml(product)}<span>${formatSize(product)}</span></div>${notesHtml}`;
 
         const stockEl = document.getElementById("modal-stock");
-        const stockVal = getStockHtml(product.inventory);
+        const stockVal =
+          getSelectableWarehouseVariants(product).length > 1
+            ? ""
+            : getStockHtml(product.inventory);
         if (stockVal) {
           stockEl.innerHTML = `<div style="color:#d9534f; font-weight:bold; font-size:0.95rem; border:1px solid #d9534f; display:inline-block; padding:3px 10px; border-radius:4px; background:#fff0f0;">🔥 Fast Moving: Only ${product.inventory} Left!</div>`;
           stockEl.style.display = "block";
@@ -2137,22 +3283,30 @@
           stockEl.style.display = "none";
         }
 
-        document.getElementById("modal-price").textContent =
-          "$" + product.price;
-        updateModalButtonState(product.id);
+        document.getElementById("modal-price").innerHTML =
+          formatProductPrice(product);
+        updateModalButtonState(currentModalProductRef);
         document.getElementById("modal").classList.add("open");
       };
 
-      window.openModalById = function (id) {
-        const p = window.perfumeDB.find((x) => x.id === id);
+      window.openModalByRef = function (productRef) {
+        const p = getRenderableProductByRef(productRef);
         if (p) openModal(p);
       };
 
       function setupSearch() {
         const globalSearch = document.getElementById("global-search-input");
-        globalSearch.addEventListener("change", (e) => {
+        const runSearch = (e) => {
           const val = e.target.value.trim();
           if (val) switchToGrid("Search:" + val);
+        };
+        globalSearch.addEventListener("change", runSearch);
+        globalSearch.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            runSearch(e);
+            globalSearch.blur();
+          }
         });
       }
 
@@ -2161,9 +3315,25 @@
         document.getElementById("sidebar-overlay").classList.remove("active");
         if (action === "Home") {
           viewMode = "home";
+          setGridNavigationVisible(false);
+          if (window.location.hash) {
+            history.replaceState(
+              null,
+              "",
+              window.location.pathname + window.location.search,
+            );
+          }
+          const globalSearch = document.getElementById("global-search-input");
+          if (globalSearch) globalSearch.value = "";
+          renderHome();
           document.getElementById("home-view").style.display = "block";
           document.getElementById("grid-view").style.display = "none";
-          window.scrollTo({ top: 0 });
+          const savedHomePosition = homeScrollPosition;
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: savedHomePosition, behavior: "auto" });
+            });
+          });
         } else switchToGrid(action);
       };
 
@@ -2172,6 +3342,7 @@
           document.getElementById("home-view").style.display = "block";
           document.getElementById("grid-view").style.display = "none";
           viewMode = "home";
+          setGridNavigationVisible(false);
         }
         document.getElementById("sidebar").classList.remove("active");
         document.getElementById("sidebar-overlay").classList.remove("active");
@@ -2181,7 +3352,12 @@
           const targetId = "brand-" + safeName;
           const element = document.getElementById(targetId);
           if (element) {
-            const headerOffset = 65;
+            const header = document.querySelector(".site-header");
+            const banner = document.getElementById("wholesale-banner");
+            const headerOffset =
+              (header ? header.offsetHeight : 0) +
+              (banner ? banner.offsetHeight : 0) +
+              16;
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition =
               elementPosition + window.pageYOffset - headerOffset;
@@ -2189,6 +3365,20 @@
           } else switchToGrid(brandName === "Other" ? "Other" : brandName);
         }, 50);
       };
+
+      function setGridNavigationVisible(visible) {
+        const headerBackButton = document.getElementById("header-back-btn");
+        if (headerBackButton) {
+          headerBackButton.classList.toggle("visible", Boolean(visible));
+        }
+      }
+
+      function getInitialViewFromHash() {
+        const route = String(window.location.hash || "").toLowerCase();
+        if (route === "#hot-selling") return "HotSelling";
+        if (route === "#new-arrivals") return "NewArrival";
+        return "";
+      }
 
       function setupMenu() {
         const trigger = document.getElementById("menu-trigger");
@@ -2202,6 +3392,11 @@
         overlay.onclick = toggle;
       }
 
+      window.closeProductModal = function () {
+        document.getElementById("modal").classList.remove("open");
+        currentModalProductRef = null;
+      };
+
       // Toast 函数供页面任何位置调用
       function showToast(msg) {
         const t = document.getElementById("toast");
@@ -2210,54 +3405,194 @@
         setTimeout(() => t.classList.remove("show"), 2000);
       }
 
-      window.updateItemQty = function (id, delta) {
-        const db = window.perfumeDB;
-        const product = db.find((p) => p.id === id);
-        if (!product) return;
+      function getRecommendedWarehouse(variants) {
+        const availableCodes = new Set(
+          variants.map((variant) => normalizeWarehouseCode(variant.warehouse)),
+        );
+        const cartCounts = {};
+        cartItems.forEach((item) => {
+          const code = normalizeWarehouseCode(item.warehouse);
+          if (!code) return;
+          cartCounts[code] =
+            (cartCounts[code] || 0) + (Number(item.quantity) || 0);
+        });
 
-        let existing = cartItems.find((c) => c.name === id);
+        const rankedCartWarehouses = Object.entries(cartCounts)
+          .filter(([code]) => availableCodes.has(code))
+          .sort((a, b) => {
+            if (b[1] !== a[1]) return b[1] - a[1];
+            if (a[0] === activeWarehouseCode) return -1;
+            if (b[0] === activeWarehouseCode) return 1;
+            return getWarehouseSortIndex(a[0]) - getWarehouseSortIndex(b[0]);
+          });
+
+        if (rankedCartWarehouses.length > 0) {
+          return {
+            code: rankedCartWarehouses[0][0],
+            reason: "Recommended to keep more of your order in the same warehouse.",
+          };
+        }
+        if (availableCodes.has(activeWarehouseCode)) {
+          return {
+            code: activeWarehouseCode,
+            reason: `Recommended from your selected ${getWarehouseLabelByCode(activeWarehouseCode)}.`,
+          };
+        }
+        return {
+          code: normalizeWarehouseCode(variants[0].warehouse),
+          reason: "This warehouse currently has the item available.",
+        };
+      }
+
+      window.openWarehouseChoiceByRef = function (productRef) {
+        const product = getRenderableProductByRef(productRef);
+        if (!product) return;
+        const variants = getSelectableWarehouseVariants(product);
+        const purchasableVariants = variants.filter(hasValidPrice);
+        if (purchasableVariants.length === 0) {
+          showToast("Price is pending for this item.");
+          return;
+        }
+        if (purchasableVariants.length === 1) {
+          updateItemQty(getProductReference(purchasableVariants[0]), 1);
+          return;
+        }
+
+        const recommendation = getRecommendedWarehouse(purchasableVariants);
+        pendingWarehouseProductRef = productRef;
+        recommendedWarehouseCode = recommendation.code;
+        selectedWarehouseCode = recommendation.code;
+
+        document.getElementById("warehouse-choice-title").textContent =
+          product.name || "Select Warehouse";
+        document.getElementById("warehouse-choice-copy").textContent =
+          recommendation.reason;
+        renderWarehouseChoiceOptions();
+        const modal = document.getElementById("warehouse-choice-modal");
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+      };
+
+      function renderWarehouseChoiceOptions() {
+        const product = getRenderableProductByRef(pendingWarehouseProductRef);
+        const options = document.getElementById("warehouse-choice-options");
+        if (!product || !options) return;
+        options.innerHTML = getSelectableWarehouseVariants(product)
+          .filter(hasValidPrice)
+          .map((variant) => {
+            const code = normalizeWarehouseCode(variant.warehouse);
+            const selected = code === selectedWarehouseCode;
+            const recommended = code === recommendedWarehouseCode;
+            return `
+              <button type="button" class="warehouse-choice-option${selected ? " selected" : ""}" aria-pressed="${selected}" onclick="selectWarehouseOption('${code}')">
+                <span class="warehouse-choice-option-main">
+                  <strong>${getWarehouseLabel(variant)}</strong>
+                  <span class="warehouse-choice-sku">SKU ${variant.id}</span>
+                </span>
+                ${recommended ? '<span class="warehouse-recommended">Recommended</span>' : ""}
+              </button>`;
+          })
+          .join("");
+      }
+
+      window.selectWarehouseOption = function (code) {
+        selectedWarehouseCode = normalizeWarehouseCode(code);
+        renderWarehouseChoiceOptions();
+      };
+
+      window.closeWarehouseChoice = function () {
+        const modal = document.getElementById("warehouse-choice-modal");
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        pendingWarehouseProductRef = null;
+        selectedWarehouseCode = null;
+        recommendedWarehouseCode = null;
+      };
+
+      window.confirmWarehouseChoice = function () {
+        const product = getRenderableProductByRef(pendingWarehouseProductRef);
+        const variant = getSelectableWarehouseVariants(product).find(
+          (item) =>
+            normalizeWarehouseCode(item.warehouse) === selectedWarehouseCode &&
+            hasValidPrice(item),
+        );
+        if (!variant) return;
+        closeWarehouseChoice();
+        updateItemQty(getProductReference(variant), 1);
+      };
+
+      function refreshProductButtons() {
+        document.querySelectorAll("[data-btn-wrap]").forEach((wrap) => {
+          wrap.innerHTML = getAddButtonHtml(wrap.getAttribute("data-btn-wrap"));
+        });
+        if (currentModalProductRef)
+          updateModalButtonState(currentModalProductRef);
+      }
+
+      window.updateItemQty = function (productRef, delta) {
+        if (checkoutChecking || ![1, -1].includes(delta)) return;
+        loadCart();
+        const product = getRenderableProductByRef(productRef);
+        if (!product) {
+          showToast("This item is no longer available. Please review your cart.");
+          return;
+        }
+        if (delta > 0 && !hasValidPrice(product)) {
+          showToast("Price is pending for this item.");
+          return;
+        }
+
+        const sku = normalizeSku(product.id);
+        const warehouseCode = normalizeWarehouseCode(product.warehouse);
+        let existing = cartItems.find(
+          (item) =>
+            normalizeSku(item.name) === sku &&
+            normalizeWarehouseCode(item.warehouse) === warehouseCode,
+        );
+        const warehouseQuantity = cartItems.filter((item) =>
+          cartStockKey(item.name, item.warehouse) === cartStockKey(product.id, product.warehouse))
+          .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        if (delta > 0 && warehouseQuantity + delta > getOrderStockLimit(product)) {
+          showToast(`Only ${getOrderStockLimit(product)} available in ${warehouseCode} Warehouse.`);
+          return;
+        }
         if (!existing && delta > 0) {
-          let sizeLabel = product.ml
-            ? isNaN(Number(product.ml))
-              ? `(${product.ml})`
-              : `(${product.ml}ml)`
-            : "";
+          const productSize = getProductSizeValue(product);
           cartItems.push({
-            name: id,
-            caption: `${id} - ${product.name} ${sizeLabel}`,
-            img: product.img,
+            name: product.id,
+            caption: `${product.id} - ${product.name}`,
+            img: getProductImage(product),
             price: Number(product.price),
             brand: product.brand,
-            ml: product.ml,
+            ml: productSize,
+            warehouse: product.warehouse,
             quantity: 1,
           });
           showToast("Added to Cart! 🛒");
         } else if (existing) {
-          existing.quantity += delta;
+          existing.quantity = (Number(existing.quantity) || 0) + delta;
           if (existing.quantity <= 0)
-            cartItems = cartItems.filter((c) => c.name !== id);
+            cartItems = cartItems.filter(
+              (item) =>
+                !(
+                  normalizeSku(item.name) === sku &&
+                  normalizeWarehouseCode(item.warehouse) === warehouseCode
+                ),
+            );
         }
 
         saveCart();
         updateWholesaleBanner();
-
-        // 核心修改 2：通过 data-btn-wrap 找到所有对应这个商品ID的容器，统一批量更新！
-        const newBtnHtml = getAddButtonHtml(id);
-        document.querySelectorAll(`[data-btn-wrap="${id}"]`).forEach((wrap) => {
-          wrap.innerHTML = newBtnHtml;
-        });
-
-        // 弹窗内的独立更新逻辑
-        if (currentModalProductId === id) updateModalButtonState(id);
+        refreshProductButtons();
       };
 
-      function updateModalButtonState(id) {
+      function updateModalButtonState(productRef) {
         const container = document.getElementById("modal-action-area");
-        container.innerHTML = getAddButtonHtml(id);
+        container.innerHTML = getAddButtonHtml(productRef);
       }
 
       function loadCart() {
-        cartItems = JSON.parse(localStorage.getItem("perfumeCart") || "[]");
+        cartItems = readStoredCart();
         updateCartCount();
         updateWholesaleBanner();
       }
@@ -2273,8 +3608,12 @@
         document.querySelectorAll(".modal").forEach((o) =>
           o.addEventListener("click", (e) => {
             if (e.target === o) {
-              o.classList.remove("open");
-              currentModalProductId = null;
+              if (o.id === "warehouse-choice-modal") {
+                closeWarehouseChoice();
+              } else {
+                o.classList.remove("open");
+                if (o.id === "modal") currentModalProductRef = null;
+              }
             }
           }),
         );

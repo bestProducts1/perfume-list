@@ -4,40 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Your Cart</title>
-    <script>
-      !(function (f, b, e, v, n, t, s) {
-        if (f.fbq) return;
-        n = f.fbq = function () {
-          n.callMethod
-            ? n.callMethod.apply(n, arguments)
-            : n.queue.push(arguments);
-        };
-        if (!f._fbq) f._fbq = n;
-        n.push = n;
-        n.loaded = !0;
-        n.version = "2.0";
-        n.queue = [];
-        t = b.createElement(e);
-        t.async = !0;
-        t.src = v;
-        s = b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t, s);
-      })(
-        window,
-        document,
-        "script",
-        "https://connect.facebook.net/en_US/fbevents.js",
-      );
-      fbq("init", "9083739771684521");
-      fbq("track", "PageView");
-    </script>
-    <noscript
-      ><img
-        height="1"
-        width="1"
-        style="display: none"
-        src="https://www.facebook.com/tr?id=9083739771684521&ev=PageView&noscript=1"
-    /></noscript>
     <link rel="icon" type="image/png" href="icon/32.png" />
     <link rel="apple-touch-icon" href="icon/180.png" />
     <style>
@@ -198,8 +164,13 @@
         justify-content: space-between;
         align-items: flex-start;
         margin-bottom: 8px;
-        height: 2.6em;
-        overflow: hidden;
+        min-height: 2.6em;
+        height: auto;
+        overflow: visible;
+      }
+      .item-header > div:first-child {
+        flex: 1;
+        min-width: 0;
       }
       .item-title {
         font-family: "Times New Roman", serif;
@@ -312,6 +283,19 @@
         font-size: 1rem;
         color: #555;
       }
+      .summary-quantity-total {
+        align-items: center;
+        margin: 10px 0 12px;
+        padding: 10px 12px;
+        border-radius: 4px;
+        background: #fff8df;
+        color: #8a6a00;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+      .summary-quantity-total span:last-child {
+        font-size: 1.25rem;
+      }
       .summary-total {
         margin-top: 15px;
         padding-top: 15px;
@@ -322,6 +306,20 @@
       }
       .discount-text {
         color: #28a745;
+      }
+      .shipping-text {
+        color: #7b6020;
+      }
+      .warehouse-pill {
+        display: inline-flex;
+        margin-top: 5px;
+        padding: 3px 7px;
+        border: 1px solid #dfd4b9;
+        border-radius: 999px;
+        background: #fbf7ec;
+        color: #7b6020;
+        font-size: 0.7rem;
+        font-weight: 800;
       }
 
       /* Fixed Bottom Actions */
@@ -407,6 +405,102 @@
         text-decoration: none;
         border-radius: 4px;
       }
+
+      /* Website-owned confirmation dialog */
+      .cart-confirm-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.62);
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          opacity 0.2s ease,
+          visibility 0.2s ease;
+      }
+      .cart-confirm-overlay.open {
+        opacity: 1;
+        visibility: visible;
+      }
+      .cart-confirm-dialog {
+        width: min(360px, 100%);
+        max-height: calc(100dvh - 40px);
+        overflow-y: auto;
+        padding: 24px;
+        border-top: 4px solid var(--accent-color);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+        transform: translateY(12px) scale(0.98);
+        transition: transform 0.2s ease;
+      }
+      .cart-confirm-overlay.open .cart-confirm-dialog {
+        transform: translateY(0) scale(1);
+      }
+      .cart-confirm-kicker {
+        margin-bottom: 8px;
+        color: #8a6a00;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+      }
+      .cart-confirm-title {
+        margin: 0;
+        color: #1f1f1f;
+        font-size: 1.35rem;
+        line-height: 1.2;
+      }
+      .cart-confirm-message {
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+        margin: 10px 0 22px;
+        color: #666;
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+      .cart-confirm-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .cart-confirm-btn {
+        min-height: 46px;
+        border: 1px solid #d7d7d7;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .cart-confirm-cancel {
+        background: #fff;
+        color: #333;
+      }
+      .cart-confirm-submit {
+        border-color: #000;
+        background: #000;
+        color: #fff;
+      }
+      .cart-confirm-btn:focus-visible {
+        outline: 3px solid rgba(178, 137, 0, 0.3);
+        outline-offset: 2px;
+      }
+      .cart-validation-status {
+        padding: 12px 14px;
+        margin-bottom: 15px;
+        background: #fff8e1;
+        border: 1px solid #e5d7a6;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+      .cart-validation-status[data-state="error"] { color: #a12d25; }
+      .action-btn:disabled, .qty-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
   </head>
   <body>
@@ -419,7 +513,7 @@
       <div class="header-title">SHOPPING CART</div>
 
       <div class="header-right" onclick="handleBack()">
-        <span>◀ BACK</span>
+        <span>BACK</span>
       </div>
     </header>
 
@@ -442,6 +536,8 @@
       <nav>
         <a class="menu-link" href="index.html">Home</a>
         <a class="menu-link" href="index.html">Shop All</a>
+        <a class="menu-link" href="index.html#hot-selling">Hot Selling</a>
+        <a class="menu-link" href="index.html#new-arrivals">New Arrivals</a>
         <a class="menu-link" href="https://wa.me/16232027321" target="_blank"
           >Contact Us</a
         >
@@ -449,6 +545,7 @@
     </div>
 
     <div id="capture-area">
+      <div id="cart-validation-status" class="cart-validation-status" role="status" aria-live="polite" hidden></div>
       <ul id="cart-items-list" class="cart-items-list"></ul>
 
       <div id="cart-summary" class="cart-summary" style="display: none">
@@ -461,6 +558,10 @@
           <span>Other Quantity</span>
           <span id="other-brands-count">0</span>
         </div>
+        <div class="summary-row summary-quantity-total">
+          <span>Total Quantity</span>
+          <span id="total-quantity-count">0</span>
+        </div>
         <div
           class="summary-row"
           style="border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px"
@@ -471,6 +572,10 @@
         <div class="summary-row discount-text">
           <span>Volume Discount</span>
           <span id="discount-amount">-$0.00</span>
+        </div>
+        <div class="summary-row shipping-text">
+          <span>Shipping</span>
+          <span id="shipping-amount">$0.00</span>
         </div>
         <div class="summary-row summary-total">
           <span>Total</span>
@@ -504,6 +609,9 @@
         >
           Volume Discounts
         </h3>
+        <p style="margin:8px 0 0; color:#7b6020; font-size:0.85rem; font-weight:700;">
+          FREE shipping on every order
+        </p>
         <div id="tiers-list" class="tiers-grid"></div>
       </div>
     </div>
@@ -526,7 +634,46 @@
       </button>
     </div>
 
-    <script src="db.js"></script>
+    <div
+      id="cart-confirm-overlay"
+      class="cart-confirm-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+      aria-labelledby="cart-confirm-title"
+      aria-describedby="cart-confirm-message"
+      onclick="handleCartConfirmBackdrop(event)"
+    >
+      <div class="cart-confirm-dialog">
+        <div class="cart-confirm-kicker">SHOPPING CART</div>
+        <h2 id="cart-confirm-title" class="cart-confirm-title">
+          Clear your cart?
+        </h2>
+        <p id="cart-confirm-message" class="cart-confirm-message">
+          This will remove all items from your cart.
+        </p>
+        <div class="cart-confirm-actions">
+          <button
+            type="button"
+            id="cart-confirm-cancel"
+            class="cart-confirm-btn cart-confirm-cancel"
+            onclick="closeCartConfirm()"
+          >
+            Keep Items
+          </button>
+          <button
+            type="button"
+            id="cart-confirm-submit"
+            class="cart-confirm-btn cart-confirm-submit"
+            onclick="confirmCartAction()"
+          >
+            Clear Cart
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="db.js?v=12"></script>
     <script>
       // ================= UI Logic =================
       function toggleSidebar() {
@@ -552,13 +699,27 @@
       const cartItemsList = document.getElementById("cart-items-list");
       const clearCartBtn = document.getElementById("clear-cart-btn");
       const sendOrderBtn = document.getElementById("send-order-btn");
+      const cartConfirmOverlay = document.getElementById(
+        "cart-confirm-overlay",
+      );
+      const cartConfirmTitle = document.getElementById("cart-confirm-title");
+      const cartConfirmMessage = document.getElementById(
+        "cart-confirm-message",
+      );
+      const cartConfirmSubmit = document.getElementById("cart-confirm-submit");
+      let pendingCartConfirmAction = null;
+      let cartConfirmReturnFocus = null;
+      let cartChecking = false;
+      const cartValidationStatus = document.getElementById("cart-validation-status");
 
       const summaryEls = {
         total: document.getElementById("total-price"),
         subtotal: document.getElementById("subtotal-price"),
         discount: document.getElementById("discount-amount"),
+        shipping: document.getElementById("shipping-amount"),
         lv: document.getElementById("lv-count"),
         other: document.getElementById("other-brands-count"),
+        totalQty: document.getElementById("total-quantity-count"),
         upsell: document.getElementById("upsell-message"),
         tiersList: document.getElementById("tiers-list"),
         container: document.getElementById("cart-summary"),
@@ -566,6 +727,20 @@
       };
 
       const whatsappNumber = "16232027321";
+
+      function normalizeWarehouseCode(value) {
+        return String(value || "")
+          .trim()
+          .toUpperCase()
+          .replace(/\s+WAREHOUSE$/, "")
+          .trim();
+      }
+
+      function normalizeWarehouseLabel(value) {
+        const code = normalizeWarehouseCode(value);
+        if (!code) return "";
+        return `${code} Warehouse`;
+      }
 
       const tiers = [
         { min: 1, max: 1, percent: 0 },
@@ -581,15 +756,31 @@
       ];
 
       function loadCart() {
-        return JSON.parse(localStorage.getItem("perfumeCart") || "[]");
+        return readStoredCart();
       }
       function saveCart(cart) {
         localStorage.setItem("perfumeCart", JSON.stringify(cart));
         window.dispatchEvent(new Event("storage"));
       }
 
+      function formatCartSize(value) {
+        const size = String(value ?? "").trim();
+        if (!size) return "";
+        return /^\d+(?:\.\d+)?$/.test(size) ? `${size}ml` : size;
+      }
+
+      function getCartDisplayTitle(item) {
+        const title = String(item.caption || item.name || "Product").trim();
+        const size = formatCartSize(item.ml);
+        if (!size) return title;
+        const escapedSize = size.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return title.replace(new RegExp(`\\s+\\(${escapedSize}\\)\\s*$`, "i"), "");
+      }
+
       function renderCart() {
         const cart = loadCart();
+        sendOrderBtn.disabled = cartChecking || cart.length === 0;
+        clearCartBtn.disabled = cartChecking || cart.length === 0;
         cartItemsList.innerHTML = "";
 
         if (cart.length === 0) {
@@ -610,7 +801,14 @@
         cart.forEach((item, index) => {
           const price = Number(item.price) || 0;
           const subtotal = (price * item.quantity).toFixed(2);
-          const displayTitle = item.caption;
+          const displayTitle = getCartDisplayTitle(item);
+          const warehouseLabel = normalizeWarehouseLabel(item.warehouse);
+          const sizeLabel = formatCartSize(item.ml);
+          const product = getCartProduct(item);
+          const sameStockQuantity = cart.filter((entry) =>
+            cartStockKey(entry.name, entry.warehouse) === cartStockKey(item.name, item.warehouse))
+            .reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0);
+          const cannotAdd = cartChecking || sameStockQuantity >= getOrderStockLimit(product);
 
           const li = document.createElement("li");
           li.className = "cart-item";
@@ -618,21 +816,29 @@
                 <img src="${item.img}" class="cart-item-img" alt="Product">
                 <div class="item-content">
                     <div class="item-header">
-                        <h3 class="item-title">${displayTitle}</h3>
+                        <div>
+                          <h3 class="item-title">${displayTitle}</h3>
+                          ${warehouseLabel ? `<span class="warehouse-pill">${warehouseLabel}</span>` : ""}
+                        </div>
                         <button class="remove-btn-icon" onclick="removeItem(${index})">&times;</button>
                     </div>
-                    
+
                     <div class="info-row">
                         <span class="info-label">Price</span>
                         <span>$${price.toFixed(2)}</span>
                     </div>
+
+                    ${sizeLabel ? `<div class="info-row">
+                        <span class="info-label">Size</span>
+                        <span>${sizeLabel}</span>
+                    </div>` : ""}
 
                     <div class="info-row">
                         <span class="info-label">Quantity</span>
                         <div class="qty-wrapper">
                             <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
                             <div class="qty-display">${item.quantity}</div>
-                            <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                            <button class="qty-btn" aria-label="Increase quantity" ${cannotAdd ? "disabled" : ""} onclick="updateQty(${index}, 1)">+</button>
                         </div>
                     </div>
 
@@ -655,10 +861,10 @@
         let other = 0;
 
         cart.forEach((item) => {
-          const qty = item.quantity;
+          const qty = Number(item.quantity) || 0;
           totalQty += qty;
           subtotal += item.price * qty;
-          if (item.caption.toLowerCase().includes("louis vuitton")) lv += qty;
+          if (String(item.caption || "").toLowerCase().includes("louis vuitton")) lv += qty;
           else other += qty;
         });
 
@@ -667,20 +873,24 @@
           (t) => totalQty >= t.min && totalQty <= t.max,
         ) || { percent: 0 };
         const discountVal = subtotal * tier.percent;
-        const finalTotal = subtotal - discountVal;
+        const shipping = getShippingCost(totalQty);
+        const finalTotal = subtotal - discountVal + shipping;
 
         // Render Summary
         summaryEls.lv.textContent = lv;
         summaryEls.other.textContent = other;
+        summaryEls.totalQty.textContent = totalQty;
         summaryEls.subtotal.textContent = `$${subtotal.toFixed(2)}`;
         summaryEls.discount.textContent = `-$${discountVal.toFixed(2)} (${(
           tier.percent * 100
         ).toFixed(0)}%)`;
-        summaryEls.total.textContent = `$${Math.round(finalTotal).toFixed(2)}`;
+        summaryEls.shipping.textContent =
+          shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`;
+        summaryEls.total.textContent = `$${finalTotal.toFixed(2)}`;
 
         // Upsell Logic
         const nextTier = tiers.find((t) => t.min > totalQty);
-        if (nextTier && totalQty >= 5) {
+        if (nextTier) {
           const needed = nextTier.min - totalQty;
           if (needed <= 5) {
             summaryEls.upsell.style.display = "block";
@@ -710,9 +920,21 @@
 
       // Actions
       window.updateQty = (index, change) => {
+        if (cartChecking || ![1, -1].includes(change)) return;
         const cart = loadCart();
         if (cart[index]) {
-          cart[index].quantity += change;
+          if (change > 0) {
+            const product = getCartProduct(cart[index]);
+            const limit = getOrderStockLimit(product);
+            const sameStockQuantity = cart.filter((item) =>
+              cartStockKey(item.name, item.warehouse) === cartStockKey(cart[index].name, cart[index].warehouse))
+              .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+            if (sameStockQuantity + change > limit) {
+              setCartValidationStatus(`Only ${limit} currently available in this warehouse. Please check your cart before checkout.`, "error");
+              return;
+            }
+          }
+          cart[index].quantity = (Number(cart[index].quantity) || 0) + change;
           if (cart[index].quantity <= 0) {
             cart.splice(index, 1);
           }
@@ -722,73 +944,139 @@
       };
 
       window.removeItem = (index) => {
-        if (confirm("Remove this item?")) {
-          const cart = loadCart();
-          cart.splice(index, 1);
-          saveCart(cart);
-          renderCart();
-        }
+        if (cartChecking) return;
+        openCartConfirm({
+          title: "Remove this item?",
+          message: "This item will be removed from your cart.",
+          confirmLabel: "Remove Item",
+          onConfirm: () => {
+            const cart = loadCart();
+            cart.splice(index, 1);
+            saveCart(cart);
+            renderCart();
+          },
+        });
       };
 
       clearCartBtn.onclick = () => {
-        if (confirm("Clear entire cart?")) {
-          localStorage.removeItem("perfumeCart");
+        if (cartChecking) return;
+        openCartConfirm({
+          title: "Clear your cart?",
+          message: "This will remove all items from your cart.",
+          confirmLabel: "Clear Cart",
+          onConfirm: () => {
+            localStorage.removeItem("perfumeCart");
+            renderCart();
+          },
+        });
+      };
+
+      function openCartConfirm({ title, message, confirmLabel, onConfirm, cancelLabel = "Keep Items" }) {
+        cartConfirmReturnFocus = document.activeElement;
+        pendingCartConfirmAction = onConfirm;
+        cartConfirmTitle.textContent = title;
+        cartConfirmMessage.textContent = message;
+        cartConfirmSubmit.textContent = confirmLabel;
+        document.getElementById("cart-confirm-cancel").textContent = cancelLabel;
+        cartConfirmOverlay.classList.add("open");
+        cartConfirmOverlay.setAttribute("aria-hidden", "false");
+        requestAnimationFrame(() => cartConfirmSubmit.focus());
+      }
+
+      window.closeCartConfirm = function () {
+        cartConfirmOverlay.classList.remove("open");
+        cartConfirmOverlay.setAttribute("aria-hidden", "true");
+        pendingCartConfirmAction = null;
+        if (cartConfirmReturnFocus?.focus) cartConfirmReturnFocus.focus();
+      };
+
+      window.confirmCartAction = function () {
+        const action = pendingCartConfirmAction;
+        window.closeCartConfirm();
+        if (typeof action === "function") action();
+      };
+
+      window.handleCartConfirmBackdrop = function (event) {
+        if (event.target === cartConfirmOverlay) window.closeCartConfirm();
+      };
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && cartConfirmOverlay.classList.contains("open")) {
+          window.closeCartConfirm();
+        }
+        if (event.key === "Tab" && cartConfirmOverlay.classList.contains("open")) {
+          const cancel = document.getElementById("cart-confirm-cancel");
+          if (event.shiftKey && document.activeElement === cancel) {
+            event.preventDefault(); cartConfirmSubmit.focus();
+          } else if (!event.shiftKey && document.activeElement === cartConfirmSubmit) {
+            event.preventDefault(); cancel.focus();
+          }
+        }
+      });
+
+      function setCartValidationStatus(message, state = "ready") {
+        cartValidationStatus.hidden = !message;
+        cartValidationStatus.textContent = message;
+        cartValidationStatus.dataset.state = state;
+      }
+
+      async function reviewLatestCart(checkout = false) {
+        if (cartChecking || !loadCart().length) return;
+        cartChecking = true;
+        sendOrderBtn.querySelector("span").textContent = "Checking...";
+        setCartValidationStatus("Checking the latest prices and warehouse inventory...");
+        renderCart();
+        try {
+          const products = await fetchLatestProductData();
+          const cart = loadCart();
+          const snapshot = JSON.stringify(cart);
+          const result = reconcileCart(cart, products);
+          if (result.changes.length) {
+            setCartValidationStatus("Your cart needs an update. Review the changes before checkout.", "error");
+            openCartConfirm({
+              title: "Review cart changes",
+              message: result.changes.join("\n\n") + "\n\nYour warehouse choices will not be changed. Update your cart, then review the new total before checkout.",
+              confirmLabel: "Update Cart",
+              cancelLabel: "Not Now",
+              onConfirm: () => {
+                if (JSON.stringify(loadCart()) !== snapshot) {
+                  reviewLatestCart();
+                  return;
+                }
+                saveCart(result.items);
+                renderCart();
+                setCartValidationStatus(result.items.length
+                  ? "Cart updated. Please review the new total, then select Checkout."
+                  : "These items are no longer available. Please continue shopping.");
+              },
+            });
+            return;
+          }
+          saveCart(result.items);
+          setCartValidationStatus("Prices and inventory checked. Availability is confirmed again at checkout.");
+          if (checkout && result.items.length) {
+            const msg = buildWhatsAppOrderMessage(result.items, tiers);
+            window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+          }
+        } catch (error) {
+          setCartValidationStatus("We could not verify current prices and inventory. Nothing has been sent. Check your connection and select Checkout to try again.", "error");
+        } finally {
+          cartChecking = false;
+          sendOrderBtn.querySelector("span").textContent = "Checkout";
           renderCart();
         }
-      };
+      }
 
-      // ================= FIXED SEND ORDER LOGIC =================
-      sendOrderBtn.onclick = () => {
-        const cart = loadCart();
-        if (cart.length === 0) return alert("Cart is empty");
-
-        let totalQty = 0;
-        let lvCount = 0;
-        let otherCount = 0;
-
-        cart.forEach((item) => {
-          const qty = item.quantity;
-          totalQty += qty;
-          if (item.caption.toLowerCase().includes("louis vuitton")) {
-            lvCount += qty;
-          } else {
-            otherCount += qty;
-          }
-        });
-
-        // 1. 使用 \n 来代替 %0A，让 JS 字符串自然换行
-        let msg = `*New Order Request* 📦\n`;
-        msg += `----------------------------\n`;
-
-        cart.forEach((item) => {
-  // 兼容历史缓存：优先取 item.id，若无则从 window.perfumeDB 匹配
-  const dbProduct = (window.perfumeDB || []).find(p => p.name === item.name);
-  const productId = item.id || (dbProduct ? dbProduct.id : '');
-  const idStr = productId ?`${productId}-` : '';
-
-  msg += `${idStr}${item.caption} x *${item.quantity}*\n\n`;
-});
-
-        msg += `----------------------------\n`;
-        msg += `LV Quantity: ${lvCount}\n`;
-        msg += `Other Quantity: ${otherCount}\n`;
-        msg += `*Total Quantity: ${totalQty} pcs*\n`;
-
-        msg += `----------------------------\n`;
-        msg += `*Total Amount:* ${summaryEls.total.textContent}`;
-
-        // 2. 关键步骤：使用 encodeURIComponent 对整个消息进行编码
-        // 这样 & 会被转换为 %26，换行符 \n 会被转换为 %0A，避免链接截断
-        const encodedMsg = encodeURIComponent(msg);
-
-        window.open(
-          `https://wa.me/${whatsappNumber}?text=${encodedMsg}`,
-          "_blank",
-        );
-      };
+      sendOrderBtn.onclick = () => reviewLatestCart(true);
 
       // Init
-      document.addEventListener("DOMContentLoaded", renderCart);
+      document.addEventListener("DOMContentLoaded", () => {
+        renderCart();
+        reviewLatestCart();
+      });
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) reviewLatestCart();
+      });
     </script>
   </body>
 </html>
