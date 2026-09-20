@@ -7,9 +7,9 @@ const SHEET_URL =
 
 // 缓存时间 (1分钟)
 const CACHE_DURATION = 1 * 60 * 1000;
-const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Data_V12";
-const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Time_V12";
-const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Last_Valid_Data_V12";
+const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Data_V13";
+const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Time_V13";
+const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Last_Valid_Data_V13";
 const MIN_ORDER_STOCK = 19;
 let latestProductRequest = null;
 
@@ -88,7 +88,7 @@ async function fetchLatestProductData() {
           String(product.id || "").trim() &&
           String(product.warehouse || "").trim() &&
           String(product.name || "").trim() &&
-          Number(product.price) > 0,
+          (Number(product.price) > 0 || Number(product.coming_soon_weight) > 0),
       );
       if (!products.length) {
         throw new Error("The inventory data is incomplete. Please try again later.");
@@ -352,7 +352,8 @@ function parseCSV(csvText) {
           header === "stock" ||
           header === "inventory" ||
           header === "hot_selling_weight" ||
-          header === "new_arrival_weight"
+          header === "new_arrival_weight" ||
+          header === "coming_soon_weight"
         ) {
           val = val === "" ? "" : Number(val);
         }

@@ -179,16 +179,41 @@ test('CSV supports commas, quotes, multiline cells and rejects incomplete rows',
   assert.throws(() => s.parseCSV('id,name\nTX-A,"unfinished'));
 });
 
-test('simplified sheet derives warehouses from SKU and keeps supplier SKU private', () => {
+test('simplified sheet derives warehouses, parses launch weights and keeps supplier SKU private', () => {
   const { sandbox: s } = createContext();
-  const csv = 'sku,brand,name,target,price,ml,stock,hot_selling_weight,new_arrival_weight,image_url,sku2\nTX-A001,Valentino,Donna,Women,36,100,48,,,https://example.test/a.webp,供应商SKU一\nNE-B002,Dior,Sauvage,Men,38,100,19,,,https://example.test/b.webp,供应商SKU二';
+  const csv = 'sku,brand,name,target,price,ml,stock,hot_selling_weight,new_arrival_weight,coming_soon_weight,image_url,sku2\nTX-A001,Valentino,Donna,Women,36,100,48,,,,https://example.test/a.webp,供应商SKU一\nNE-B002,Dior,Sauvage,Men,38,100,19,,,3,https://example.test/b.webp,供应商SKU二';
   const rows = s.parseCSV(csv);
-  assert.deepEqual(plain(rows.map(({ id, warehouse, gender, stock, img, sku2 }) => ({ id, warehouse, gender, stock, img, sku2 }))), [
-    { id: 'TX-A001', warehouse: 'TX', gender: 'Women', stock: 48, img: 'https://example.test/a.webp', sku2: '供应商SKU一' },
-    { id: 'NE-B002', warehouse: 'NE', gender: 'Men', stock: 19, img: 'https://example.test/b.webp', sku2: '供应商SKU二' },
+  assert.deepEqual(plain(rows.map(({ id, warehouse, gender, stock, coming_soon_weight, img, sku2 }) => ({ id, warehouse, gender, stock, coming_soon_weight, img, sku2 }))), [
+    { id: 'TX-A001', warehouse: 'TX', gender: 'Women', stock: 48, coming_soon_weight: '', img: 'https://example.test/a.webp', sku2: '供应商SKU一' },
+    { id: 'NE-B002', warehouse: 'NE', gender: 'Men', stock: 19, coming_soon_weight: 3, img: 'https://example.test/b.webp', sku2: '供应商SKU二' },
   ]);
   assert.equal(s.getOrderStockLimit(rows[1]), 19);
   assert.equal(s.searchProducts(rows, '供应商SKU一').length, 0);
+});
+
+test('coming soon products are weighted, visible in details and never purchasable', async () => {
+  const { sandbox: s, cart } = createContext();
+  const coming = product({ stock: 0, inventory: 0, coming_soon_weight: 2 });
+  const unweighted = product({ id: 'TX-A056', stock: 0, inventory: 0 });
+  const arrived = product({ id: 'TX-A057', stock: 19, inventory: 19, coming_soon_weight: 1 });
+  assert.equal(s.isComingSoonProduct(coming), true);
+  assert.equal(s.isComingSoonProduct(unweighted), false);
+  assert.equal(s.isComingSoonProduct(arrived), false);
+  s.perfumeDB = [coming, unweighted, arrived];
+  const ranked = s.getRankedProducts(s.perfumeDB.filter(s.isComingSoonProduct), 'coming_soon_weight');
+  assert.deepEqual(plain(ranked.map((p) => p.id)), ['TX-A055']);
+  const ref = s.getProductReference(coming);
+  assert.match(s.getAddButtonHtml(ref), /COMING SOON/);
+  assert.match(s.getProductAvailabilityHtml(coming), /Arriving Soon/);
+  s.updateItemQty(ref, 1);
+  assert.deepEqual(cart(), []);
+  s.fetch = async () => ({
+    ok: true,
+    text: async () => 'id,warehouse,name,stock,price,ml,brand,coming_soon_weight\nTX-C1,TX,Preview,0,,100,Brand,1',
+  });
+  const [pendingPrice] = await s.fetchLatestProductData();
+  assert.equal(pendingPrice.price, '');
+  assert.equal(s.isComingSoonProduct(pendingPrice), true);
 });
 
 test('shipping is always free and both pages preserve the original discount schedule', () => {
@@ -217,7 +242,7 @@ test('Escape closes the enlarged product card without reacting to other keys', (
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
 test('fresh checkout requests bypass cache and reject bad or duplicate data', async () => {
   const { sandbox: s, memory } = createContext();
-  memory.set('perfumeDB_BestProducts_Last_Valid_Data_V12', JSON.stringify([product({ price: 1 })]));
+  memory.set('perfumeDB_BestProducts_Last_Valid_Data_V13', JSON.stringify([product({ price: 1 })]));
   await assert.rejects(() => s.fetchLatestProductData(), /offline/);
   let fetchOptions;
   s.fetch = async (_url, options) => { fetchOptions = options; return { ok: true, text: async () => csvFor(product()) }; };

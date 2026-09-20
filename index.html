@@ -24,6 +24,7 @@
         /* Tag Colors */
         --tag-hot: #d9534f;
         --tag-new: #007bff;
+        --tag-coming: #a8741a;
         --tag-sale: #28a745;
       }
 
@@ -759,6 +760,13 @@
         color: #81796b;
         cursor: not-allowed;
       }
+      .action-btn-black.coming-soon-action:disabled {
+        background: #f3e4bf;
+        border: 1px solid #d7b76e;
+        color: #765213;
+        cursor: not-allowed;
+        letter-spacing: 0.06em;
+      }
       .price-pending-label {
         color: #8a8173;
         font-size: 0.9rem;
@@ -1034,8 +1042,16 @@
       .badge-new {
         background: var(--tag-new);
       }
+      .badge-coming {
+        background: var(--tag-coming);
+      }
       .badge-sale {
         background: var(--tag-sale);
+      }
+      .warehouse-tag.coming-soon-tag {
+        border-color: #dfc27f;
+        background: #fff7e4;
+        color: #765213;
       }
       .scroll-card-title {
         font-size: 0.85rem;
@@ -1546,6 +1562,9 @@
           <a class="menu-link" onclick="handleMenuClick('NewArrival')"
             >New Arrivals</a
           >
+          <a class="menu-link" onclick="handleMenuClick('ComingSoon')"
+            >Coming Soon</a
+          >
           <a
             class="menu-link"
             onclick="handleMenuClick('Gender:Women')"
@@ -1863,7 +1882,7 @@
       </div>
     </div>
 
-    <script src="db.js?v=12"></script>
+    <script src="db.js?v=13"></script>
     <script>
       // ================= Catalog & Checkout Logic =================
       const WHATSAPP_NUMBER = "16232027321";
@@ -2120,6 +2139,25 @@
         return weights.length > 0 ? Math.min(...weights) : Infinity;
       }
 
+      function hasMinimumDisplayStock(product) {
+        return getProductVariants(product).some((variant) => {
+          const rawStock =
+            variant?.stock !== "" && variant?.stock != null
+              ? variant.stock
+              : variant?.inventory;
+          const stock =
+            rawStock === "" || rawStock == null ? NaN : Number(rawStock);
+          return Number.isFinite(stock) && stock >= MIN_DISPLAY_STOCK;
+        });
+      }
+
+      function isComingSoonProduct(product) {
+        return (
+          Number.isFinite(getProductWeight(product, "coming_soon_weight")) &&
+          !hasMinimumDisplayStock(product)
+        );
+      }
+
       function getRankedProducts(products, fieldName) {
         return groupProductsForDisplay(
           products.filter((product) => Number(product[fieldName]) > 0),
@@ -2150,6 +2188,9 @@
       }
 
       function getProductAvailabilityHtml(product) {
+        if (isComingSoonProduct(product)) {
+          return '<span class="warehouse-tag coming-soon-tag">Arriving Soon</span>';
+        }
         const codes = getSelectableWarehouseVariants(product).map((variant) =>
           normalizeWarehouseCode(variant.warehouse),
         );
@@ -2223,7 +2264,7 @@
         const matchingProducts = (window.perfumeDB || []).filter(
           (product) =>
             getProductFamilyKey(product) === familyKey &&
-            isProductAvailable(product),
+            (isProductAvailable(product) || isComingSoonProduct(product)),
         );
         if (matchingProducts.length === 0) return null;
         if (warehouseCode !== "ALL") {
@@ -2632,6 +2673,9 @@
 
       function getAddButtonHtml(productRef) {
         const product = getRenderableProductByRef(productRef);
+        if (isComingSoonProduct(product)) {
+          return '<button type="button" class="action-btn-black coming-soon-action" disabled aria-disabled="true">COMING SOON</button>';
+        }
         const variants = getSelectableWarehouseVariants(product);
         if (!variants.some(hasValidPrice)) {
           return '<div class="price-pending-action">Available after pricing</div>';
@@ -2668,10 +2712,9 @@
       // --- Home Render Logic ---
       function renderHome() {
         ensureActiveWarehouse();
-        const allAvailableProducts = (window.perfumeDB || []).filter(
-          isProductAvailable,
-        );
-        const db = (window.perfumeDB || []).filter(
+        const allProducts = window.perfumeDB || [];
+        const allAvailableProducts = allProducts.filter(isProductAvailable);
+        const db = allProducts.filter(
           (product) =>
             isProductAvailable(product) &&
             normalizeWarehouseCode(product.warehouse) === activeWarehouseCode,
@@ -2707,6 +2750,20 @@
           );
           newArrivalSection.id = "home-new-arrivals";
           container.appendChild(newArrivalSection);
+        }
+
+        const comingSoonItems = getRankedProducts(
+          allProducts.filter(isComingSoonProduct),
+          "coming_soon_weight",
+        );
+        if (comingSoonItems.length > 0) {
+          const comingSoonSection = createBrandSection(
+            "Coming Soon",
+            comingSoonItems,
+            "ComingSoon",
+          );
+          comingSoonSection.id = "home-coming-soon";
+          container.appendChild(comingSoonSection);
         }
 
         const getWarehouseCriteria = (filterKey) => {
@@ -2825,6 +2882,8 @@
             badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
           if (Number.isFinite(getProductWeight(p, "new_arrival_weight")))
             badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
+          if (isComingSoonProduct(p))
+            badgesHtml += '<div class="badge-tag badge-coming">SOON</div>';
           if (p.sale == 1)
             badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
 
@@ -2834,7 +2893,7 @@
             ? `<span class="gender-tag ${genderClass}">${p.gender}</span>`
             : "";
           const stockHtml =
-            getSelectableWarehouseVariants(p).length > 1
+            isComingSoonProduct(p) || getSelectableWarehouseVariants(p).length > 1
               ? ""
               : getStockHtml(p.inventory);
           const productRef = getProductReference(p);
@@ -3039,7 +3098,8 @@
         document.getElementById("grid-view").style.display = "block";
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        const db = (window.perfumeDB || []).filter(isProductAvailable);
+        const allProducts = window.perfumeDB || [];
+        const db = allProducts.filter(isProductAvailable);
         let filtered = [];
         let title = "";
 
@@ -3095,6 +3155,12 @@
         } else if (criteria === "NewArrival") {
           filtered = getRankedProducts(db, "new_arrival_weight");
           title = "New Arrivals";
+        } else if (criteria === "ComingSoon") {
+          filtered = getRankedProducts(
+            allProducts.filter(isComingSoonProduct),
+            "coming_soon_weight",
+          );
+          title = "Coming Soon";
         } else if (criteria === "All") {
           filtered = groupProductsForDisplay(db, db);
           title = "All Products";
@@ -3164,6 +3230,8 @@
             badgesHtml += '<div class="badge-tag badge-hot">HOT</div>';
           if (Number.isFinite(getProductWeight(p, "new_arrival_weight")))
             badgesHtml += '<div class="badge-tag badge-new">NEW</div>';
+          if (isComingSoonProduct(p))
+            badgesHtml += '<div class="badge-tag badge-coming">SOON</div>';
           if (p.sale == 1)
             badgesHtml += '<div class="badge-tag badge-sale">SALE</div>';
           const imageSrc = getProductImage(p);
@@ -3173,7 +3241,7 @@
             ? ` · <span class="gender-tag ${genderClass}">${p.gender}</span>`
             : "";
           const stockHtml =
-            getSelectableWarehouseVariants(p).length > 1
+            isComingSoonProduct(p) || getSelectableWarehouseVariants(p).length > 1
               ? ""
               : getStockHtml(p.inventory);
           const productRef = getProductReference(p);
@@ -3273,11 +3341,14 @@
           `<div style="font-size:1.1rem; color:#333; margin-bottom:5px;">${product.brand}</div><div style="margin-bottom:8px; font-size:0.85rem; color:#555; display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;"><span class="gender-tag ${genderClass}" style="font-size:0.8rem; margin:0;">${product.gender || "Unisex"}</span>${getProductAvailabilityHtml(product)}<span>${formatSize(product)}</span></div>${notesHtml}`;
 
         const stockEl = document.getElementById("modal-stock");
-        const stockVal =
-          getSelectableWarehouseVariants(product).length > 1
-            ? ""
-            : getStockHtml(product.inventory);
-        if (stockVal) {
+        const comingSoon = isComingSoonProduct(product);
+        const stockVal = comingSoon || getSelectableWarehouseVariants(product).length > 1
+          ? ""
+          : getStockHtml(product.inventory);
+        if (comingSoon) {
+          stockEl.innerHTML = '<div class="warehouse-tag coming-soon-tag" style="font-size:0.92rem; padding:7px 14px;">Arriving Soon</div>';
+          stockEl.style.display = "block";
+        } else if (stockVal) {
           stockEl.innerHTML = `<div style="color:#d9534f; font-weight:bold; font-size:0.95rem; border:1px solid #d9534f; display:inline-block; padding:3px 10px; border-radius:4px; background:#fff0f0;">🔥 Fast Moving: Only ${product.inventory} Left!</div>`;
           stockEl.style.display = "block";
         } else {
@@ -3378,6 +3449,7 @@
         const route = String(window.location.hash || "").toLowerCase();
         if (route === "#hot-selling") return "HotSelling";
         if (route === "#new-arrivals") return "NewArrival";
+        if (route === "#coming-soon") return "ComingSoon";
         return "";
       }
 
@@ -3536,6 +3608,10 @@
         const product = getRenderableProductByRef(productRef);
         if (!product) {
           showToast("This item is no longer available. Please review your cart.");
+          return;
+        }
+        if (delta > 0 && isComingSoonProduct(product)) {
+          showToast("This item is coming soon.");
           return;
         }
         if (delta > 0 && !hasValidPrice(product)) {
