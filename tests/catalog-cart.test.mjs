@@ -179,15 +179,16 @@ test('CSV supports commas, quotes, multiline cells and rejects incomplete rows',
   assert.throws(() => s.parseCSV('id,name\nTX-A,"unfinished'));
 });
 
-test('current sheet fields map to storefront fields and warehouses come from sheet data', () => {
+test('simplified sheet derives warehouses from SKU and keeps supplier SKU private', () => {
   const { sandbox: s } = createContext();
-  const csv = 'sku,warehouse,brand,name,target,price,ml,#REF!,stock_status,image_url\nTX-A001,TX,Valentino,Donna,Women,36,100,48,,https://example.test/a.webp\nNE-B002,NE,Dior,Sauvage,Men,38,100,,AVAILABLE,https://example.test/b.webp';
+  const csv = 'sku,brand,name,target,price,ml,stock,hot_selling_weight,new_arrival_weight,image_url,sku2\nTX-A001,Valentino,Donna,Women,36,100,48,,,https://example.test/a.webp,供应商SKU一\nNE-B002,Dior,Sauvage,Men,38,100,19,,,https://example.test/b.webp,供应商SKU二';
   const rows = s.parseCSV(csv);
-  assert.deepEqual(plain(rows.map(({ id, warehouse, gender, stock, img }) => ({ id, warehouse, gender, stock, img }))), [
-    { id: 'TX-A001', warehouse: 'TX', gender: 'Women', stock: 48, img: 'https://example.test/a.webp' },
-    { id: 'NE-B002', warehouse: 'NE', gender: 'Men', stock: '', img: 'https://example.test/b.webp' },
+  assert.deepEqual(plain(rows.map(({ id, warehouse, gender, stock, img, sku2 }) => ({ id, warehouse, gender, stock, img, sku2 }))), [
+    { id: 'TX-A001', warehouse: 'TX', gender: 'Women', stock: 48, img: 'https://example.test/a.webp', sku2: '供应商SKU一' },
+    { id: 'NE-B002', warehouse: 'NE', gender: 'Men', stock: 19, img: 'https://example.test/b.webp', sku2: '供应商SKU二' },
   ]);
-  assert.equal(s.getOrderStockLimit(rows[1]), Number.MAX_SAFE_INTEGER);
+  assert.equal(s.getOrderStockLimit(rows[1]), 19);
+  assert.equal(s.searchProducts(rows, '供应商SKU一').length, 0);
 });
 
 test('shipping is always free and both pages preserve the original discount schedule', () => {

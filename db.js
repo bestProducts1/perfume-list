@@ -361,8 +361,8 @@ function parseCSV(csvText) {
       });
 
       // Accept the current sheet names and the legacy storefront names. The
-      // warehouse column is authoritative; while the sheet is being prepared,
-      // a SKU such as TX-A001 can also supply its warehouse code.
+      // current sheet derives the warehouse from a SKU such as TX-A001, while
+      // explicit warehouse fields remain supported for older data sources.
       obj.id = obj.id || obj.sku || "";
       obj.img = obj.image_url || obj.img || "";
       obj.gender = obj.target || obj.gender || "";
