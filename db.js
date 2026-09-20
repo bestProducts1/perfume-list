@@ -10,7 +10,7 @@ const CACHE_DURATION = 1 * 60 * 1000;
 const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Data_V12";
 const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Time_V12";
 const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Last_Valid_Data_V12";
-const MIN_ORDER_STOCK = 1;
+const MIN_ORDER_STOCK = 19;
 let latestProductRequest = null;
 
 window.perfumeDB = [];
@@ -145,7 +145,12 @@ function getOrderStockLimit(product) {
   const stock = rawStock === "" || rawStock == null ? NaN : Number(rawStock);
   const price = Number(product?.price);
   const status = String(product?.stock_status || "").trim().toUpperCase();
-  const unavailable = ["OUT OF STOCK", "MISSING INVENTORY", "UNAVAILABLE"].includes(status);
+  const unavailable = [
+    "OUT OF STOCK",
+    "MISSING INVENTORY",
+    "UNAVAILABLE",
+    "LOW / HIDDEN",
+  ].includes(status);
   if (unavailable || !Number.isFinite(price) || price <= 0) return 0;
   if (Number.isFinite(stock)) {
     return stock >= MIN_ORDER_STOCK ? Math.floor(stock) : 0;

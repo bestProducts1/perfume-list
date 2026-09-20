@@ -72,13 +72,15 @@ function createContext(page = 'index.html') {
   };
 }
 
-test('positive stock is orderable while zero stock and unknown prices are blocked', () => {
+test('stock below 19 and unknown prices are blocked', () => {
   const { sandbox: s } = createContext();
-  assert.equal(s.getOrderStockLimit(product({ stock: 1 })), 1);
-  assert.equal(s.getOrderStockLimit(product({ stock: 14 })), 14);
+  assert.equal(s.getOrderStockLimit(product({ stock: 1 })), 0);
+  assert.equal(s.getOrderStockLimit(product({ stock: 18 })), 0);
+  assert.equal(s.getOrderStockLimit(product({ stock: 19 })), 19);
   assert.equal(s.getOrderStockLimit(product({ stock: 0 })), 0);
   assert.equal(s.getOrderStockLimit(product({ stock: '', inventory: '', stock_status: 'AVAILABLE' })), Number.MAX_SAFE_INTEGER);
   assert.equal(s.getOrderStockLimit(product({ stock: 20, stock_status: 'OUT OF STOCK' })), 0);
+  assert.equal(s.getOrderStockLimit(product({ stock: 20, stock_status: 'LOW / HIDDEN' })), 0);
   for (const price of ['', 0, -1, NaN, Infinity]) assert.equal(s.getOrderStockLimit(product({ price })), 0);
 });
 
