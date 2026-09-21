@@ -1882,7 +1882,7 @@
       </div>
     </div>
 
-    <script src="db.js?v=13"></script>
+    <script src="db.js?v=17"></script>
     <script>
       // ================= Catalog & Checkout Logic =================
       const WHATSAPP_NUMBER = "16232027321";
@@ -3674,7 +3674,7 @@
         updateWholesaleBanner();
       }
       function saveCart() {
-        localStorage.setItem("perfumeCart", JSON.stringify(cartItems));
+        writeStoredCart(cartItems);
         updateCartCount();
       }
       function updateCartCount() {

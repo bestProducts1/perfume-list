@@ -67,7 +67,10 @@ function createContext(page = 'index.html') {
     dispatchDocument(type, event) {
       (documentListeners.get(type) || []).forEach((handler) => handler(event));
     },
-    setCart: (cart) => memory.set('perfumeCart', JSON.stringify(cart)),
+    setCart: (cart) => {
+      memory.set('bestProducts1SharedCartResetV3', 'done');
+      memory.set('bestProducts1SharedCartV3', JSON.stringify(cart));
+    },
     cart: () => plain(sandbox.readStoredCart()),
   };
 }
@@ -142,9 +145,27 @@ test('warehouse labels normalize and malformed storage cannot crash a cart', () 
   const { sandbox: s, memory } = createContext();
   assert.equal(s.reconcileCart([item({ warehouse: 'tx Warehouse' })], [product()]).items.length, 1);
   for (const raw of ['broken', '{}', 'null']) {
-    memory.set('perfumeCart', raw);
+    memory.set('bestProducts1SharedCartResetV3', 'done');
+    memory.set('bestProducts1SharedCartV3', raw);
     assert.deepEqual(plain(s.readStoredCart()), []);
   }
+});
+
+test('catalog storage clears old carts once and then uses the shared official-SKU cart', () => {
+  const { sandbox: s, memory } = createContext();
+  memory.set('perfumeCart', JSON.stringify([item({ name: 'B02', warehouse: '' })]));
+  memory.set('bestProducts1CatalogCartV1', JSON.stringify([item()]));
+  memory.set('bestProducts1CatalogCartV2', JSON.stringify([item()]));
+  memory.set('bestProducts1SkuCartV2', JSON.stringify([item()]));
+  assert.deepEqual(plain(s.readStoredCart()), []);
+  assert.equal(memory.has('perfumeCart'), false);
+  assert.equal(memory.has('bestProducts1CatalogCartV1'), false);
+  assert.equal(memory.has('bestProducts1CatalogCartV2'), false);
+  assert.equal(memory.has('bestProducts1SkuCartV2'), false);
+
+  s.writeStoredCart([item()]);
+  assert.deepEqual(plain(s.readStoredCart().map((entry) => entry.name)), ['TX-A055']);
+  assert.equal(JSON.parse(memory.get('bestProducts1SharedCartV3'))[0].name, 'TX-A055');
 });
 
 test('search supports accents, volume, aliases and both warehouses', () => {
@@ -242,7 +263,7 @@ test('Escape closes the enlarged product card without reacting to other keys', (
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
 test('fresh checkout requests bypass cache and reject bad or duplicate data', async () => {
   const { sandbox: s, memory } = createContext();
-  memory.set('perfumeDB_BestProducts_Last_Valid_Data_V13', JSON.stringify([product({ price: 1 })]));
+  memory.set('perfumeDB_BestProducts_Catalog_Last_Valid_Data_V13', JSON.stringify([product({ price: 1 })]));
   await assert.rejects(() => s.fetchLatestProductData(), /offline/);
   let fetchOptions;
   s.fetch = async (_url, options) => { fetchOptions = options; return { ok: true, text: async () => csvFor(product()) }; };

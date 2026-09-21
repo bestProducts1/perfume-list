@@ -7,9 +7,11 @@ const SHEET_URL =
 
 // 缓存时间 (1分钟)
 const CACHE_DURATION = 1 * 60 * 1000;
-const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Data_V13";
-const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Time_V13";
-const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Last_Valid_Data_V13";
+const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Catalog_Data_V13";
+const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V13";
+const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V13";
+const CART_STORAGE_KEY = "bestProducts1SharedCartV3";
+const CART_RESET_KEY = "bestProducts1SharedCartResetV3";
 const MIN_ORDER_STOCK = 19;
 let latestProductRequest = null;
 
@@ -124,18 +126,48 @@ function cartStockKey(sku, warehouse) {
   return `${String(sku || "").trim().toUpperCase()}::${code}`;
 }
 
-function readStoredCart() {
+function parseStoredCart(rawCart) {
   try {
-    const cart = JSON.parse(localStorage.getItem("perfumeCart") || "[]");
+    const cart = JSON.parse(rawCart || "[]");
     return Array.isArray(cart) ? cart.filter((item) => item && typeof item === "object") : [];
   } catch (error) {
     return [];
   }
 }
 
+function resetCatalogCartOnce() {
+  if (localStorage.getItem(CART_RESET_KEY) === "done") return;
+  localStorage.removeItem("perfumeCart");
+  localStorage.removeItem("bestProducts1CatalogCartV1");
+  localStorage.removeItem("bestProducts1CatalogCartV2");
+  localStorage.removeItem("bestProducts1SkuCartV1");
+  localStorage.removeItem("bestProducts1SkuCartV2");
+  localStorage.removeItem(CART_STORAGE_KEY);
+  localStorage.setItem(CART_RESET_KEY, "done");
+}
+
+function readStoredCart() {
+  resetCatalogCartOnce();
+  return parseStoredCart(localStorage.getItem(CART_STORAGE_KEY));
+}
+
+function writeStoredCart(items) {
+  resetCatalogCartOnce();
+  const cart = Array.isArray(items) ? items : [];
+  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+}
+
+function clearStoredCart() {
+  resetCatalogCartOnce();
+  localStorage.removeItem(CART_STORAGE_KEY);
+}
+
 function getCartProduct(item, products = window.perfumeDB) {
   const key = cartStockKey(item.name, item.warehouse);
-  return (products || []).find((p) => cartStockKey(p.id, p.warehouse) === key);
+  const catalog = Array.isArray(products) ? products : [];
+  return catalog.find(
+    (product) => cartStockKey(product.id, product.warehouse) === key,
+  );
 }
 
 function getOrderStockLimit(product) {

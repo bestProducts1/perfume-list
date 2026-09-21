@@ -674,7 +674,7 @@
       </div>
     </div>
 
-    <script src="db.js?v=13"></script>
+    <script src="db.js?v=17"></script>
     <script>
       // ================= UI Logic =================
       function toggleSidebar() {
@@ -760,7 +760,7 @@
         return readStoredCart();
       }
       function saveCart(cart) {
-        localStorage.setItem("perfumeCart", JSON.stringify(cart));
+        writeStoredCart(cart);
         window.dispatchEvent(new Event("storage"));
       }
 
@@ -966,7 +966,7 @@
           message: "This will remove all items from your cart.",
           confirmLabel: "Clear Cart",
           onConfirm: () => {
-            localStorage.removeItem("perfumeCart");
+            clearStoredCart();
             renderCart();
           },
         });
