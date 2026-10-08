@@ -654,3 +654,38 @@ test('gift-set x4 and x6 labels never precede or replace the official SKU purcha
   assert.ok(unitLines.every((line) => !line.includes('×') && !/\s[x*]\s?\d/i.test(line)));
   assert.ok(message.includes('Total Quantity: 5 pcs'));
 });
+
+test('desktop and mobile share one discounted bottom summary that hides for an empty order', () => {
+  const { sandbox: s, setCart, element } = createContext();
+  const items = [item({ quantity: 11, price: 33 })];
+  setCart(items);
+  s.updateOrderUI();
+  const summary = model.getOrderSummary(items, site.tiers);
+  assert.equal(element('mobile-order-bar').hidden, false);
+  assert.equal(element('mobile-order-total').textContent, '$' + summary.totalAmount.toFixed(2));
+  assert.equal(element('mobile-order-quantity').textContent, `11 items · ${site.freeShipping ? 'free shipping' : 'excl. shipping'}`);
+  assert.equal(element('body').classList.contains('has-order'), true);
+  assert.equal([...source('index.html').matchAll(/id="mobile-order-bar"/g)].length, 1);
+  assert.match(source('styles.css'), /@media\(min-width:651px\)\{\s*\.mobile-order-bar\{display:block/);
+  assert.match(source('styles.css'), /body\.has-order>\.toast\{bottom:/);
+  setCart([]);
+  s.updateOrderUI();
+  assert.equal(element('mobile-order-bar').hidden, true);
+  assert.equal(element('body').classList.contains('has-order'), false);
+});
+
+test('closing a cleared order returns focus to the header instead of the hidden bottom bar', () => {
+  const { sandbox: s, setCart, element } = createContext();
+  const opener = element('bottom-order-trigger');
+  const header = element('header-order-trigger');
+  s.document.querySelector = (selector) => selector === '.header-actions [data-action="open-cart"]' ? header : null;
+  setCart([item()]);
+  s.document.activeElement = opener;
+  s.openCart();
+  opener.getClientRects = () => [];
+  setCart([]);
+  s.updateOrderUI();
+  element('cart-dialog').close();
+  assert.equal(s.document.activeElement, header);
+  assert.equal(element('mobile-order-bar').hidden, true);
+});

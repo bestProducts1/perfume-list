@@ -373,7 +373,7 @@ document.querySelectorAll('dialog').forEach(dialog=>{
     if(!stillOpen.length)document.body.style.overflow='';
     syncToastHost();
     const opener=returnFocus.get(dialog);
-    if(opener?.isConnected&&(!stillOpen.length||stillOpen.at(-1).contains(opener)))opener.focus({preventScroll:true});
+    if(opener?.isConnected&&opener.getClientRects().length&&(!stillOpen.length||stillOpen.at(-1).contains(opener)))opener.focus({preventScroll:true});
     else if(stillOpen.length)stillOpen.at(-1).querySelector('button:not(:disabled)')?.focus({preventScroll:true});
     else if(dialog.id==='cart-dialog')document.querySelector('.header-actions [data-action="open-cart"]')?.focus({preventScroll:true});
     else if(dialog.id==='product-dialog'){

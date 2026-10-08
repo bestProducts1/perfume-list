@@ -14,15 +14,15 @@ export function initBrandPicker(root=document){
   if(!select||!trigger||!panel||!search||!list)return;
   // Keep keyboard traversal beside the trigger, not at the end of the page.
   get('brand-picker').append(panel);
-  list.tabIndex=-1;
+  list.tabIndex=0;
   let open=false,active=-1,visible=[];
   const options=()=>[...select.options].map(option=>({value:option.value,label:option.textContent}));
 
   function highlight(scroll=false){
     [...list.querySelectorAll('[role="option"]')].forEach((row,index)=>row.classList.toggle('is-active',index===active));
     const row=list.querySelectorAll('[role="option"]')[active];
-    if(row){search.setAttribute('aria-activedescendant',row.id);if(scroll){if(row.offsetTop<list.scrollTop)list.scrollTop=row.offsetTop;else if(row.offsetTop+row.offsetHeight>list.scrollTop+list.clientHeight)list.scrollTop=row.offsetTop+row.offsetHeight-list.clientHeight;}}
-    else search.removeAttribute('aria-activedescendant');
+    if(row){search.setAttribute('aria-activedescendant',row.id);list.setAttribute('aria-activedescendant',row.id);if(scroll){if(row.offsetTop<list.scrollTop)list.scrollTop=row.offsetTop;else if(row.offsetTop+row.offsetHeight>list.scrollTop+list.clientHeight)list.scrollTop=row.offsetTop+row.offsetHeight-list.clientHeight;}}
+    else{search.removeAttribute('aria-activedescendant');list.removeAttribute('aria-activedescendant');}
   }
 
   function render(){
@@ -69,12 +69,14 @@ export function initBrandPicker(root=document){
   }
 
   function close(restore=false){
-    if(!open)return;open=false;panel.hidden=true;trigger.setAttribute('aria-expanded','false');search.setAttribute('aria-expanded','false');search.removeAttribute('aria-activedescendant');
+    if(!open)return;open=false;panel.hidden=true;trigger.setAttribute('aria-expanded','false');search.setAttribute('aria-expanded','false');search.removeAttribute('aria-activedescendant');list.removeAttribute('aria-activedescendant');
     if(restore)trigger.focus({preventScroll:true});
   }
 
   function show(){
-    if(open){close(true);return;}root.dispatchEvent(new CustomEvent('catalog-picker-open',{detail:{id:'brand'}}));search.value='';active=-1;render();open=true;panel.hidden=false;trigger.setAttribute('aria-expanded','true');search.setAttribute('aria-expanded','true');position();highlight(true);search.focus({preventScroll:true});
+    if(open){close(true);return;}root.dispatchEvent(new CustomEvent('catalog-picker-open',{detail:{id:'brand'}}));search.value='';active=-1;render();open=true;panel.hidden=false;trigger.setAttribute('aria-expanded','true');search.setAttribute('aria-expanded','true');position();highlight(true);
+    // Focus the non-editable list; touch users opt into the keyboard by tapping search.
+    list.focus({preventScroll:true});
   }
 
   function choose(value){
@@ -86,10 +88,10 @@ export function initBrandPicker(root=document){
   search.addEventListener('input',()=>{active=-1;visible=[];render();});
   panel.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);return;}
-    if(event.target!==search)return;
+    if(event.target!==search&&event.target!==list)return;
     if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(visible.length){active=(active+(event.key==='ArrowDown'?1:-1)+visible.length)%visible.length;highlight(true);}}
-    else if(event.key==='Enter'){event.preventDefault();if(visible[active])choose(visible[active].value);}
-    else if((event.key==='Home'||event.key==='End')&&!search.value){event.preventDefault();active=event.key==='Home'?0:visible.length-1;highlight(true);}
+    else if(event.key==='Enter'||(event.key===' '&&event.target===list)){event.preventDefault();if(visible[active])choose(visible[active].value);}
+    else if((event.key==='Home'||event.key==='End')&&(event.target===list||!search.value)){event.preventDefault();active=event.key==='Home'?0:visible.length-1;highlight(true);}
   });
   get('brand-search-clear').addEventListener('click',()=>{search.value='';active=-1;visible=[];render();search.focus({preventScroll:true});});
   get('brand-reset').addEventListener('click',()=>choose('all'));
