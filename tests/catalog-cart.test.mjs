@@ -57,7 +57,7 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
     let html = '';
     const el = {
       id, open: false, isConnected: true, hidden: false, disabled: false, checked: true,
-      style: {}, dataset: {}, textContent: '', value: '', options: [], children: [], tabIndex: 0,
+      style: {}, dataset: {}, textContent: '', value: '', options: [], children: [], tabIndex: 0, innerHTMLWrites: 0,
       classList: {
         add: (...names) => names.forEach((n) => classes.add(n)),
         remove: (...names) => names.forEach((n) => classes.delete(n)),
@@ -83,7 +83,7 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
       },
       appendChild(child) { el.append(child); return child; },
       focus() { if (document) document.activeElement = el; },
-      contains(target) { return target === el || el.children.includes(target); },
+      contains(target) { return target === el || el.children.some((child) => child === target || child.contains?.(target)); },
       matches: (selector) => selector === ':disabled' && el.disabled,
       querySelector: () => null,
       querySelectorAll: () => [],
@@ -94,8 +94,10 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
       close() { if (!el.open) return; el.open = false; el.dispatchEvent({ type: 'close', target: el }); },
     };
     Object.defineProperty(el, 'innerHTML', {
+      configurable: true,
       get: () => html,
       set(value) {
+        el.innerHTMLWrites++;
         html = String(value);
         el.options = [...html.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)]
           .map((match) => ({ value: match[1], textContent: match[2] }));
@@ -162,6 +164,125 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
     cart: () => plain(sandbox.readStoredCart()),
     approve: () => element('confirm-submit').dispatchEvent({ type: 'click' }),
   };
+}
+
+// Deliberately small DOM fixture: quantity controls are real mock objects whose
+// identity survives text/disabled changes. A component innerHTML replacement
+// remounts its controls, so accidental full rendering cannot pass silently.
+function mountQuantityActions(context, p, { detail = false } = {}) {
+  const { sandbox: s, element } = context;
+  const suffix = `${detail ? 'detail' : 'card'}-${s.cartStockKey(p.id, p.warehouse)}`;
+  const actions = element(`actions-${suffix}`);
+  const html = Object.getOwnPropertyDescriptor(actions, 'innerHTML');
+  let revision = 0;
+  let nodes = {};
+  function refresh(value) {
+    revision++;
+    nodes = {};
+    actions.children = [];
+    const create = (name) => element(`${suffix}-${name}-${revision}`);
+    if (value.includes('quantity-stepper')) {
+      nodes.stepper = create('stepper');
+      nodes.stepper.dataset.stockKey = s.cartStockKey(p.id, p.warehouse);
+      nodes.output = create('output');
+      nodes.output.textContent = Number(value.match(/<output\b[^>]*>(\d+)<\/output>/)?.[1] || 0);
+      for (const action of ['product-minus', 'product-plus']) {
+        const button = create(action);
+        button.dataset = { action, id: s.cartStockKey(p.id, p.warehouse) };
+        button.disabled = new RegExp(`data-action="${action}"[^>]*\\bdisabled`).test(value);
+        nodes[action] = button;
+        nodes.stepper.append(button);
+      }
+      nodes.stepper.append(nodes.output);
+      nodes.stepper.querySelector = (selector) => selector === 'output' ? nodes.output
+        : selector === '[data-action="product-minus"]' ? nodes['product-minus']
+        : selector === '[data-action="product-plus"]' ? nodes['product-plus'] : null;
+      actions.append(nodes.stepper);
+    }
+    if (/data-action="add"/.test(value) || /class="primary-button detail-add"/.test(value)) {
+      nodes.add = create('add');
+      nodes.add.dataset = /data-action="add"/.test(value) ? { action: 'add', id: s.cartStockKey(p.id, p.warehouse) } : {};
+      nodes.add.disabled = /<button\b[^>]*\bdisabled/.test(value);
+      actions.append(nodes.add);
+    }
+    if (value.includes('soon-note')) { nodes.soon = create('soon'); actions.append(nodes.soon); }
+    if (value.includes('class="in-order"')) { nodes.inOrder = create('in-order'); actions.append(nodes.inOrder); }
+    if (value.includes('data-action="close-product"')) {
+      nodes.continue = create('continue'); nodes.continue.dataset.action = 'close-product'; actions.append(nodes.continue);
+    }
+  }
+  Object.defineProperty(actions, 'innerHTML', {
+    configurable: true,
+    get: html.get,
+    set(value) { html.set(value); refresh(String(value)); },
+  });
+  actions.querySelector = (selector) => selector === '.quantity-stepper' ? nodes.stepper || null
+    : selector === '[data-action="add"]' ? nodes.add?.dataset.action === 'add' ? nodes.add : null
+    : selector === '.detail-add' ? nodes.add || null
+    : selector === '.in-order' ? nodes.inOrder || null
+    : selector === '.soon-note' ? nodes.soon || null : null;
+  actions.querySelectorAll = (selector) => selector === '[data-action]'
+    ? [nodes.add, nodes['product-minus'], nodes['product-plus'], nodes.continue].filter((node) => node?.dataset.action) : [];
+  actions.innerHTML = detail ? s.detailOrderActionsHtml(p) : s.productActionsHtml(p);
+  return { actions, get nodes() { return nodes; } };
+}
+
+function mountStableCard(context, p) {
+  const { sandbox: s, element } = context;
+  const root = element('products');
+  const card = element(`card-${s.cartStockKey(p.id, p.warehouse)}`);
+  const photo = element(`photo-${s.cartStockKey(p.id, p.warehouse)}`);
+  const inOrder = element(`in-order-${s.cartStockKey(p.id, p.warehouse)}`);
+  const mounted = mountQuantityActions(context, p);
+  card.dataset = { stockKey: s.cartStockKey(p.id, p.warehouse), productId: p.id };
+  card.append(photo); card.append(mounted.actions); card.append(inOrder); root.append(card);
+  card.querySelector = (selector) => selector === '.product-actions' ? mounted.actions
+    : selector === '.in-order' ? inOrder : selector === 'img' ? photo : null;
+  root.querySelectorAll = (selector) => selector === '.product-card' ? root.children
+    : selector === '[data-action]' ? root.children.flatMap((child) => child.querySelector('.product-actions').querySelectorAll(selector)) : [];
+  return { ...mounted, card, photo, inOrder, root, get nodes() { return mounted.nodes; } };
+}
+
+function mountStableDetail(context, p) {
+  const { element } = context;
+  const root = element('product-detail');
+  const body = element('detail-body-fixture');
+  const photo = element('detail-photo-fixture');
+  body.scrollTop = 180; body.append(photo);
+  const mounted = mountQuantityActions(context, p, { detail: true });
+  root.append(body); root.append(mounted.actions);
+  root.querySelector = (selector) => selector === '.detail-order-actions' ? mounted.actions
+    : selector === '.detail-body' ? body : selector === 'img' ? photo : null;
+  root.querySelectorAll = (selector) => mounted.actions.querySelectorAll(selector);
+  return { ...mounted, root, body, photo, get nodes() { return mounted.nodes; } };
+}
+
+function mountStableCart(context) {
+  const { element, cart } = context;
+  const root = element('cart-body');
+  const summary = element('cart-summary-fixture');
+  const lines = cart().map((saved, index) => {
+    const line = element(`cart-line-fixture-${index}`);
+    const photo = element(`cart-photo-fixture-${index}`);
+    const output = element(`cart-output-fixture-${index}`); output.textContent = saved.quantity;
+    const controls = {};
+    for (const action of ['cart-minus', 'cart-plus', 'remove-line']) {
+      controls[action] = element(`${action}-fixture-${index}`);
+      controls[action].dataset = { action, index: String(index) };
+      line.append(controls[action]);
+    }
+    line.append(photo); line.append(output); root.append(line);
+    line.querySelector = (selector) => selector === 'img' ? photo : selector === 'output' ? output
+      : selector === '[data-action="cart-minus"]' ? controls['cart-minus']
+      : selector === '[data-action="cart-plus"]' ? controls['cart-plus']
+      : selector === '[data-action="remove-line"]' ? controls['remove-line'] : null;
+    return { line, photo, output, ...controls };
+  });
+  root.append(summary);
+  root.querySelector = (selector) => selector === '.order-summary' ? summary : null;
+  root.querySelectorAll = (selector) => selector === '.cart-line' ? lines.map(({ line }) => line)
+    : selector === '[data-action]' ? lines.flatMap((line) => [line['cart-minus'], line['cart-plus'], line['remove-line']]) : [];
+  return { root, summary, lines };
 }
 
 test('stock below 19 and unknown prices are blocked', () => {
@@ -767,4 +888,237 @@ test('continuing shopping closes details without opening the cart or changing qu
   assert.deepEqual(cart(), []);
   assert.match(element('product-detail').innerHTML, /Add to order/);
   assert.doesNotMatch(element('product-detail').innerHTML, /View order|Continue shopping/);
+});
+
+test('syncing a quantity stepper keeps its controls and updates inventory and checking limits', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, evaluate } = context;
+  const p = product();
+  s.perfumeDB = [p]; setCart([item({ quantity: 7 })]);
+  const mounted = mountQuantityActions(context, p);
+  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  const writes = mounted.actions.innerHTMLWrites;
+  s.syncQuantityStepper(stepper, p);
+  assert.equal(output.textContent, 7);
+  assert.equal(plus.disabled, false); assert.equal(minus.disabled, false);
+  setCart([item({ quantity: 19 })]); s.syncQuantityStepper(stepper, p);
+  assert.equal(output.textContent, 19); assert.equal(plus.disabled, true); assert.equal(minus.disabled, false);
+  evaluate('state.checking = true'); s.syncQuantityStepper(stepper, p);
+  assert.equal(plus.disabled, true); assert.equal(minus.disabled, true);
+  evaluate('state.checking = false'); setCart([item({ quantity: 18 })]); s.syncQuantityStepper(stepper, p);
+  assert.equal(output.textContent, 18); assert.equal(plus.disabled, false); assert.equal(minus.disabled, false);
+  assert.equal(mounted.actions.innerHTMLWrites, writes);
+  assert.equal(stepper.querySelector('output'), output);
+  assert.equal(stepper.querySelector('[data-action="product-plus"]'), plus);
+  assert.equal(stepper.querySelector('[data-action="product-minus"]'), minus);
+});
+
+test('homepage repeated plus and minus preserve photo, controls, focus and collection DOM', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, evaluate } = context;
+  const p = product();
+  s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p);
+  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  mounted.root.innerHTML = '<section>Stable collection and image</section>';
+  const rootHTML = mounted.root.innerHTML, rootWrites = mounted.root.innerHTMLWrites;
+  const actionWrites = mounted.actions.innerHTMLWrites;
+  s.document.activeElement = plus;
+  s.renderProducts = () => { throw new Error('Quantity updates must not rerender the collection'); };
+  for (const delta of [1, 1, -1, 1]) s.updateProductQuantity(s.cartStockKey(p.id, p.warehouse), delta);
+  assert.equal(cart()[0].quantity, 3); assert.equal(output.textContent, 3);
+  assert.equal(mounted.inOrder.textContent, '3 in your order');
+  assert.equal(mounted.card.querySelector('img'), mounted.photo);
+  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.output, output);
+  assert.equal(mounted.nodes['product-plus'], plus); assert.equal(mounted.nodes['product-minus'], minus);
+  assert.equal(mounted.actions.innerHTMLWrites, actionWrites);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
+  assert.equal(s.document.activeElement, plus);
+});
+
+test('Add and zero removal replace only product actions, not product photos or the collection', () => {
+  const context = createContext();
+  const { sandbox: s, cart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p);
+  const initialAdd = mounted.nodes.add;
+  const rootWrites = mounted.root.innerHTMLWrites, initialWrites = mounted.actions.innerHTMLWrites;
+  s.document.activeElement = initialAdd;
+  s.renderProducts = () => { throw new Error('Add and removal must not rerender photos'); };
+  const key = s.cartStockKey(p.id, p.warehouse);
+  s.addToOrder(key);
+  assert.equal(cart()[0].quantity, 1);
+  assert.equal(mounted.actions.innerHTMLWrites, initialWrites + 1);
+  assert.ok(mounted.nodes.stepper); assert.equal(mounted.nodes.add, undefined);
+  const firstStepper = mounted.nodes.stepper;
+  assert.equal(s.document.activeElement, mounted.nodes['product-plus']);
+  s.updateProductQuantity(key, 1); s.updateProductQuantity(key, -1);
+  assert.equal(mounted.nodes.stepper, firstStepper);
+  assert.equal(mounted.actions.innerHTMLWrites, initialWrites + 1);
+  s.updateProductQuantity(key, -1);
+  assert.deepEqual(cart(), []); assert.equal(mounted.nodes.stepper, undefined);
+  assert.ok(mounted.nodes.add); assert.notEqual(mounted.nodes.add, initialAdd);
+  assert.equal(mounted.actions.innerHTMLWrites, initialWrites + 2);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites);
+  assert.equal(mounted.card.querySelector('img'), mounted.photo);
+  assert.equal(mounted.inOrder.textContent, ''); assert.equal(s.document.activeElement, mounted.nodes.add);
+});
+
+test('incremental card updates isolate equal SKU values in separate warehouses', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, evaluate } = context;
+  const tx = product(), ne = product({ warehouse: 'NE', stock: 25 });
+  s.perfumeDB = [tx, ne]; setCart([item({ quantity: 2 }), item({ warehouse: 'NE', quantity: 4 })]);
+  evaluate('state.loaded = true');
+  const first = mountStableCard(context, tx), second = mountStableCard(context, ne);
+  const secondStepper = second.nodes.stepper, secondWrites = second.actions.innerHTMLWrites;
+  s.updateProductQuantity(s.cartStockKey(tx.id, tx.warehouse), 1);
+  assert.equal(first.nodes.output.textContent, 3); assert.equal(second.nodes.output.textContent, 4);
+  assert.equal(first.inOrder.textContent, '3 in your order'); assert.equal(second.inOrder.textContent, '4 in your order');
+  assert.equal(second.nodes.stepper, secondStepper); assert.equal(second.actions.innerHTMLWrites, secondWrites);
+  assert.equal(first.card.querySelector('img'), first.photo); assert.equal(second.card.querySelector('img'), second.photo);
+});
+
+test('detail repeated quantity changes leave photo, scroll body and footer controls mounted', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const mounted = mountStableDetail(context, p);
+  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  const rootHTML = mounted.root.innerHTML, rootWrites = mounted.root.innerHTMLWrites;
+  const actionWrites = mounted.actions.innerHTMLWrites;
+  s.document.activeElement = plus;
+  s.renderProducts = () => { throw new Error('Detail quantity must not redraw the collection'); };
+  s.renderDetail = () => { throw new Error('Detail quantity must not recreate product images'); };
+  for (const delta of [1, 1, -1]) s.updateProductQuantity(s.cartStockKey(p.id, p.warehouse), delta);
+  assert.equal(output.textContent, 2); assert.equal(mounted.nodes.inOrder.textContent, '2 in your order');
+  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.output, output);
+  assert.equal(mounted.nodes['product-plus'], plus); assert.equal(mounted.nodes['product-minus'], minus);
+  assert.equal(mounted.actions.innerHTMLWrites, actionWrites);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
+  assert.equal(mounted.root.querySelector('img'), mounted.photo); assert.equal(mounted.body.scrollTop, 180);
+  assert.equal(s.document.activeElement, plus);
+});
+
+test('detail first Add and removal remount only its action footer', () => {
+  const context = createContext();
+  const { sandbox: s, cart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; evaluate('state.loaded = true');
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const mounted = mountStableDetail(context, p);
+  const writes = mounted.actions.innerHTMLWrites, rootWrites = mounted.root.innerHTMLWrites;
+  s.document.activeElement = mounted.nodes.add;
+  s.renderProducts = () => { throw new Error('Detail Add must not redraw the collection'); };
+  s.renderDetail = () => { throw new Error('Detail Add must not recreate the product photo'); };
+  const key = s.cartStockKey(p.id, p.warehouse);
+  s.addToOrder(key);
+  assert.equal(cart()[0].quantity, 1); assert.equal(mounted.nodes.output.textContent, 1);
+  assert.equal(mounted.actions.innerHTMLWrites, writes + 1);
+  assert.equal(s.document.activeElement, mounted.nodes['product-plus']);
+  s.updateProductQuantity(key, -1);
+  assert.deepEqual(cart(), []); assert.ok(mounted.nodes.add); assert.equal(mounted.nodes.stepper, undefined);
+  assert.equal(mounted.actions.innerHTMLWrites, writes + 2);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.querySelector('img'), mounted.photo);
+  assert.equal(mounted.body.scrollTop, 180); assert.equal(s.document.activeElement, mounted.nodes.add);
+});
+
+test('storage and pageshow sync quantities without redrawing product images or open details', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, dispatchWindow, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
+  const card = mountStableCard(context, p);
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const detail = mountStableDetail(context, p);
+  const cardWrites = card.root.innerHTMLWrites, detailWrites = detail.root.innerHTMLWrites;
+  const cardStepper = card.nodes.stepper, detailStepper = detail.nodes.stepper;
+  s.renderProducts = () => { throw new Error('Storage/pageshow must not redraw product cards'); };
+  s.renderDetail = () => { throw new Error('Storage/pageshow must not recreate product details'); };
+  setCart([item({ quantity: 5 })]); dispatchWindow('storage', { key: storageKeys.cart });
+  assert.equal(card.nodes.output.textContent, 5); assert.equal(detail.nodes.output.textContent, 5);
+  setCart([item({ quantity: 6 })]); dispatchWindow('pageshow');
+  assert.equal(card.nodes.output.textContent, 6); assert.equal(detail.nodes.output.textContent, 6);
+  assert.equal(card.nodes.stepper, cardStepper); assert.equal(detail.nodes.stepper, detailStepper);
+  assert.equal(card.root.innerHTMLWrites, cardWrites); assert.equal(detail.root.innerHTMLWrites, detailWrites);
+  assert.equal(card.card.querySelector('img'), card.photo); assert.equal(detail.root.querySelector('img'), detail.photo);
+  assert.equal(detail.body.scrollTop, 180);
+});
+
+test('checking state updates mounted card and detail buttons without recreating their images', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
+  const card = mountStableCard(context, p);
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const detail = mountStableDetail(context, p);
+  const rootWrites = [card.root.innerHTMLWrites, detail.root.innerHTMLWrites];
+  const controls = [card.nodes['product-plus'], card.nodes['product-minus'], detail.nodes['product-plus'], detail.nodes['product-minus']];
+  s.renderProducts = () => { throw new Error('Checking must not recreate product cards'); };
+  s.renderDetail = () => { throw new Error('Checking must not recreate detail images'); };
+  evaluate('state.checking = true'); s.updateOrderUI();
+  assert.ok(controls.every((control) => control.disabled));
+  evaluate('state.checking = false'); s.updateOrderUI();
+  assert.ok(controls.every((control) => !control.disabled));
+  assert.deepEqual([card.root.innerHTMLWrites, detail.root.innerHTMLWrites], rootWrites);
+  assert.equal(card.nodes['product-plus'], controls[0]); assert.equal(detail.nodes['product-minus'], controls[3]);
+});
+
+test('cart quantity and checking updates preserve row photos and controls while updating only the summary', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item()]);
+  s.openCart();
+  const mounted = mountStableCart(context);
+  const row = mounted.lines[0], rootHTML = mounted.root.innerHTML;
+  const rootWrites = mounted.root.innerHTMLWrites, summaryWrites = mounted.summary.innerHTMLWrites;
+  s.document.activeElement = row['cart-plus'];
+  for (let quantity = 2; quantity <= 19; quantity++) s.updateCartQuantity(0, 1);
+  assert.equal(cart()[0].quantity, 19); assert.equal(row.output.textContent, 19);
+  assert.equal(row['cart-plus'].disabled, true); assert.equal(row['cart-minus'].disabled, false);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
+  assert.equal(mounted.summary.innerHTMLWrites, summaryWrites + 18);
+  const expected = model.getOrderSummary(cart(), site.tiers);
+  assert.ok(mounted.summary.innerHTML.includes(`Items (${expected.qty})`));
+  assert.ok(mounted.summary.innerHTML.includes('$' + expected.totalAmount.toFixed(2)));
+  assert.equal(row.line.querySelector('img'), row.photo); assert.equal(row.line.querySelector('output'), row.output);
+  assert.equal(row.line.querySelector('[data-action="cart-plus"]'), row['cart-plus']);
+  assert.equal(row.line.querySelector('[data-action="cart-minus"]'), row['cart-minus']);
+  evaluate('state.checking = true'); s.renderCart();
+  assert.equal(row['cart-plus'].disabled, true); assert.equal(row['cart-minus'].disabled, true); assert.equal(row['remove-line'].disabled, true);
+  evaluate('state.checking = false'); s.updateCartQuantity(0, -1);
+  assert.equal(row.output.textContent, 18); assert.equal(row['cart-plus'].disabled, false); assert.equal(row['cart-minus'].disabled, false);
+  s.perfumeDB = []; s.renderCart();
+  assert.equal(row['cart-plus'].disabled, true, 'a removed product remains unable to increase in the incremental path');
+  assert.equal(row['cart-minus'].disabled, false); assert.equal(row['remove-line'].disabled, false);
+  assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(row.line.querySelector('img'), row.photo);
+});
+
+test('cart metadata, row order and row count changes invalidate the incremental signature', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, element } = context;
+  const first = item(), second = item({ name: 'NE-A056', warehouse: 'NE', caption: 'NE-A056 - Another perfume', img: 'second.webp' });
+  s.perfumeDB = [product(), product({ id: 'NE-A056', warehouse: 'NE' })];
+  setCart([first, second]); s.renderCart();
+  const mounted = mountStableCart(context);
+  let writes = mounted.root.innerHTMLWrites;
+  const changes = [
+    { caption: 'TX-A055 - Corrected title' }, { img: 'corrected-photo.webp' },
+    { price: 40 }, { ml: '75' }, { brand: 'Corrected brand' },
+  ];
+  for (const change of changes) {
+    setCart([{ ...first, ...change }, second]); s.renderCart();
+    assert.equal(mounted.root.innerHTMLWrites, ++writes, `changed metadata ${Object.keys(change)[0]}`);
+  }
+  setCart([second, first]); s.renderCart();
+  assert.equal(mounted.root.innerHTMLWrites, ++writes, 'reordering rows rebuilds data-index associations');
+  const reordered = mounted.root.innerHTML;
+  assert.ok(reordered.indexOf('NE Warehouse') < reordered.indexOf('TX Warehouse'));
+  assert.match(reordered, /data-action="cart-minus" data-index="0"/);
+  assert.match(reordered, /data-action="cart-minus" data-index="1"/);
+  setCart([first]); s.renderCart();
+  assert.equal(mounted.root.innerHTMLWrites, ++writes, 'row removal rebuilds the drawer');
+  assert.doesNotMatch(mounted.root.innerHTML, /NE-A056/);
+  setCart([]); s.renderCart();
+  assert.equal(mounted.root.innerHTMLWrites, ++writes); assert.match(mounted.root.innerHTML, /Your order starts here/);
+  assert.equal(element('cart-actions').hidden, true);
 });

@@ -19,6 +19,7 @@ let cartEntryHandled=false;
 let toastTimer;
 let queryTimer;
 let loadTimer;
+let renderedCartSignature;
 const returnFocus=new WeakMap();
 const dialogStack=[];
 const feedbackTimers=new WeakMap();
@@ -93,12 +94,45 @@ function imageHtml(product,className=''){
   return `<img class="${className}" src="${esc(product.img)}" alt="${esc(product.name)}" loading="lazy" decoding="async">`;
 }
 
+function productActionsHtml(product){
+  if(isComingSoon(product))return `<span class="soon-note">${icon('clock')}Arriving soon</span>`;
+  if(quantityInCart(product))return stepper(product);
+  return `<button type="button" class="add-button" data-action="add" data-id="${esc(stockKey(product))}" aria-label="Add ${esc(product.name)} to order" ${remainingStock(product)<=0||state.checking?'disabled':''}>${state.view==='list'?icon('shopping-cart'):'Add'}</button>`;
+}
+
+function syncQuantityStepper(element,product){
+  const amount=quantityInCart(product);
+  element.querySelector('output').textContent=amount;
+  element.querySelector('[data-action="product-minus"]').disabled=state.checking;
+  element.querySelector('[data-action="product-plus"]').disabled=state.checking||amount>=window.getOrderStockLimit(product);
+}
+
+function updateProductCards(){
+  const root=$('products');
+  const focus=captureFocus(root);
+  const byKey=new Map(products().map(product=>[stockKey(product),product]));
+  root.querySelectorAll('.product-card').forEach(card=>{
+    const product=byKey.get(card.dataset.stockKey);if(!product)return;
+    const actions=card.querySelector('.product-actions');
+    const added=quantityInCart(product);
+    const soon=isComingSoon(product);
+    // Keep photos, titles and existing quantity buttons mounted during cart updates.
+    const matches=soon?actions.querySelector('.soon-note'):added?actions.querySelector('.quantity-stepper'):actions.querySelector('[data-action="add"]');
+    if(!matches)actions.innerHTML=productActionsHtml(product);
+    const quantity=actions.querySelector('.quantity-stepper');
+    if(quantity)syncQuantityStepper(quantity,product);
+    const add=actions.querySelector('[data-action="add"]');
+    if(add)add.disabled=state.checking||remainingStock(product)<=0;
+    card.querySelector('.in-order').textContent=added?`${added} in your order`:'';
+  });
+  restoreFocus(root,focus);
+}
+
 function productCard(product){
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
-  const soldOut=remainingStock(product)<=0;
   let label=soon?'Coming soon':Number(product.new_arrival_weight)>0?'New arrival':Number(product.hot_selling_weight)>0?'Best seller':'';
-  return `<article class="product-card" data-product-id="${esc(product.id)}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button><p class="product-size">${esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${soon?`<span class="soon-note">${icon('clock')}Arriving soon</span>`:added?stepper(product):`<button type="button" class="add-button" data-action="add" data-id="${esc(stockKey(product))}" aria-label="Add ${esc(product.name)} to order" ${soldOut||state.checking?'disabled':''}>${state.view==='list'?icon('shopping-cart'):'Add'}</button>`}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
+  return `<article class="product-card" data-product-id="${esc(product.id)}" data-stock-key="${esc(stockKey(product))}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button><p class="product-size">${esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${productActionsHtml(product)}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
 }
 
 function renderProducts(){
@@ -150,6 +184,7 @@ function populateBrands(){
 window.renderHome=function(){
   if(!products().length)return;
   clearTimeout(loadTimer);state.loaded=true;populateFilters();renderProducts();updateOrderUI();
+  if($('product-dialog').open){const product=getProduct(state.detailId);if(product)renderDetail(product);}
   if(!cartEntryHandled&&new URLSearchParams(window.location.search).get('cart')==='1'){cartEntryHandled=true;openCart();}
 };
 
@@ -185,7 +220,7 @@ function updateProductQuantity(reference,delta){
   const next=cart.filter(item=>!matches(item)||item===existing);
   // Keep the saved price and size; quantity changes must not bypass checkout approval.
   if(quantity>0)existing.quantity=quantity;
-  saveCart(quantity>0?next:next.filter(item=>!matches(item)));renderProducts();setValidation('');
+  saveCart(quantity>0?next:next.filter(item=>!matches(item)));setValidation('');
   showQuantityFeedback(product||{id:existing.name,warehouse:existing.warehouse},delta,Math.max(0,quantity));
 }
 
@@ -198,7 +233,7 @@ function addToOrder(id){
   const cart=readCart();const key=stockKey(product);const existing=cart.find(item=>window.cartStockKey(item.name,item.warehouse)===key);
   if(existing)return;
   cart.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity:1});
-  saveCart(cart);renderProducts();showQuantityFeedback(product,1,1);
+  saveCart(cart);showQuantityFeedback(product,1,1);
 }
 
 function updateOrderUI(){
@@ -208,8 +243,35 @@ function updateOrderUI(){
   $('mobile-order-total').textContent=money(summary.totalAmount);
   $('mobile-order-quantity').textContent=`${summary.qty} ${summary.qty===1?'item':'items'} · ${storefront.freeShipping?'free shipping':'excl. shipping'}`;
   document.body.classList.toggle('has-order',summary.qty>0);
+  updateProductCards();
   if($('cart-dialog').open)renderCart();
-  if($('product-dialog').open){const product=getProduct(state.detailId);if(product)renderDetail(product);}
+  if($('product-dialog').open){const product=getProduct(state.detailId);if(product)updateDetailOrderActions(product);}
+}
+
+function detailOrderActionsHtml(product){
+  const soon=isComingSoon(product);
+  const added=quantityInCart(product);
+  return `${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`Volume discounts apply at checkout. Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}`;
+}
+
+function updateDetailOrderActions(product){
+  const root=$('product-detail');
+  const actions=root.querySelector('.detail-order-actions');
+  if(!actions){renderDetail(product);return;}
+  const focus=captureFocus(root);
+  const soon=isComingSoon(product);
+  const added=quantityInCart(product);
+  const add=actions.querySelector('.detail-add');
+  const matches=soon?add&&!add.dataset.action:added?actions.querySelector('.quantity-stepper'):add?.dataset.action==='add';
+  if(!matches)actions.innerHTML=detailOrderActionsHtml(product);
+  const quantity=actions.querySelector('.quantity-stepper');
+  if(quantity)syncQuantityStepper(quantity,product);
+  const addButton=actions.querySelector('[data-action="add"]');
+  if(addButton)addButton.disabled=state.checking||remainingStock(product)<=0;
+  const inOrder=actions.querySelector('.in-order');
+  if(inOrder)inOrder.textContent=`${added} in your order`;
+  restoreFocus(root,focus);
+  syncToastHost();
 }
 
 function renderDetail(product,{resetScroll=false}={}){
@@ -217,8 +279,7 @@ function renderDetail(product,{resetScroll=false}={}){
   const scrollTop=resetScroll?0:($('product-detail').querySelector('.detail-body')?.scrollTop||0);
   const soon=isComingSoon(product);
   const warehouse=normalizeWarehouse(product.warehouse);
-  const added=quantityInCart(product);
-  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${esc(formatSize(product.ml))}</p><span class="sku">${esc(product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span></div></div><div class="detail-order-actions">${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`Volume discounts apply at checkout. Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}</div></div>`;
+  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${esc(formatSize(product.ml))}</p><span class="sku">${esc(product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span></div></div><div class="detail-order-actions">${detailOrderActionsHtml(product)}</div></div>`;
   const body=$('product-detail').querySelector('.detail-body');
   if(body)body.scrollTop=scrollTop;
   restoreFocus($('product-detail'),focus);
@@ -246,6 +307,12 @@ function cartLine(item,index){
   return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(formatSize(item.ml))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(window.cartStockKey(item.name,item.warehouse))}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button><output aria-label="Order quantity">${esc(item.quantity)}</output><button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
 }
 
+function cartSummaryHtml(summary){
+  const percent=window.formatDiscountPercent(summary.discountPercent);
+  const next=tierSchedule.find(tier=>tier.min>summary.qty);
+  return `<h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div><div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.qty} more ${next.min-summary.qty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off your entire order.`:'Your maximum volume discount is applied.'}<br>${shippingNote}</div>`;
+}
+
 function renderCart(){
   const focus=captureFocus($('cart-body'));
   const cart=readCart();const summary=getOrderSummary(cart,tierSchedule);
@@ -253,12 +320,28 @@ function renderCart(){
   $('cart-actions').hidden=!cart.length;
   $('checkout-button').disabled=state.checking||!cart.length;
   $('checkout-button').innerHTML=state.checking?`Checking your order…`:`Proceed to checkout ${icon('arrow-right')}`;
-  if(!cart.length){$('cart-body').innerHTML=`<div class="empty-state">${icon('shopping-bag')}<h3>Your order starts here</h3><p>Find a fragrance you love and add it to your order.</p><button type="button" class="primary-button" data-action="close-cart">Explore fragrances ${icon('arrow-right')}</button></div>`;restoreFocus($('cart-body'),focus);return;}
+  if(!cart.length){renderedCartSignature=undefined;$('cart-body').innerHTML=`<div class="empty-state">${icon('shopping-bag')}<h3>Your order starts here</h3><p>Find a fragrance you love and add it to your order.</p><button type="button" class="primary-button" data-action="close-cart">Explore fragrances ${icon('arrow-right')}</button></div>`;restoreFocus($('cart-body'),focus);return;}
+  const signature=JSON.stringify(cart.map(({quantity,...item})=>item));
+  const lines=[...$('cart-body').querySelectorAll('.cart-line')];
+  const orderSummary=$('cart-body').querySelector('.order-summary');
+  if(signature===renderedCartSignature&&lines.length===cart.length&&orderSummary){
+    lines.forEach(line=>{
+      const minus=line.querySelector('[data-action="cart-minus"]');
+      const item=cart[Number(minus.dataset.index)];
+      const product=window.getCartProduct(item,products());
+      const allocated=product?quantityInCart(product):0;
+      line.querySelector('output').textContent=item.quantity;
+      minus.disabled=state.checking;
+      line.querySelector('[data-action="cart-plus"]').disabled=state.checking||allocated>=window.getOrderStockLimit(product);
+      line.querySelector('[data-action="remove-line"]').disabled=state.checking;
+    });
+    orderSummary.innerHTML=cartSummaryHtml(summary);
+    restoreFocus($('cart-body'),focus);return;
+  }
   const groups=new Map();cart.forEach((item,index)=>{const code=normalizeWarehouse(item.warehouse);if(!groups.has(code))groups.set(code,[]);groups.get(code).push({item,index});});
   let rows='';groups.forEach((items,code)=>{rows+=`<h3 class="warehouse-section-title">${esc(code)} Warehouse</h3>`+items.map(({item,index})=>cartLine(item,index)).join('');});
-  const percent=window.formatDiscountPercent(summary.discountPercent);
-  const next=tierSchedule.find(tier=>tier.min>summary.qty);
-  $('cart-body').innerHTML=`${rows}<section class="order-summary" aria-label="Order summary"><h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div><div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.qty} more ${next.min-summary.qty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off your entire order.`:'Your maximum volume discount is applied.'}<br>${shippingNote}</div></section>`;
+  $('cart-body').innerHTML=`${rows}<section class="order-summary" aria-label="Order summary">${cartSummaryHtml(summary)}</section>`;
+  renderedCartSignature=signature;
   restoreFocus($('cart-body'),focus);
 }
 
@@ -304,16 +387,19 @@ function composeOrder(cart){
 
 async function checkout(){
   if(state.checking||!readCart().length)return;
-  state.checking=true;setValidation('Checking the latest prices and warehouse inventory…');renderCart();renderProducts();
+  let dataChanged=false;
+  state.checking=true;setValidation('Checking the latest prices and warehouse inventory…');updateOrderUI();
   try{
+    const previousData=JSON.stringify(products());
     const latest=await window.fetchLatestProductData();
+    dataChanged=previousData!==JSON.stringify(latest);
     const cart=readCart();const snapshot=JSON.stringify(cart);
     const result=window.reconcileCart(cart,latest);
     if(result.changes.length){
       setValidation('Review your order changes before checkout.','error');
       confirmAction('Review order changes',result.changes.join('\n\n')+'\n\nYour selected warehouses stay the same. Update the order, review the new total, then check out again.','Update order',()=>{
         if(JSON.stringify(readCart())!==snapshot){setValidation('Your order changed in another window. Please check out again to review the latest version.','error');return;}
-        saveCart(result.items);renderProducts();setValidation(result.items.length?'Order updated. Review the total, then proceed to checkout.':'These items are no longer available. Please choose other fragrances.');
+        saveCart(result.items);setValidation(result.items.length?'Order updated. Review the total, then proceed to checkout.':'These items are no longer available. Please choose other fragrances.');
       });return;
     }
     if(!result.items.length){setValidation('Your order is empty.');return;}
@@ -321,7 +407,7 @@ async function checkout(){
     const text=composeOrder(result.items);
     window.location.href=`https://wa.me/${storefront.whatsappNumber}?text=${encodeURIComponent(text)}`;
   }catch(error){setValidation('We couldn’t verify current prices and inventory. Nothing has been sent. Please check your connection and try again.','error');}
-  finally{state.checking=false;updateOrderUI();renderProducts();}
+  finally{state.checking=false;if(dataChanged)window.renderHome();else updateOrderUI();}
 }
 
 document.addEventListener('click',(event)=>{
@@ -348,8 +434,8 @@ document.addEventListener('click',(event)=>{
     case 'close-cart':closeDialog($('cart-dialog'));break;
     case 'cart-minus':updateCartQuantity(index,-1);break;
     case 'cart-plus':updateCartQuantity(index,1);break;
-    case 'remove-line':{if(state.checking)break;const item=readCart()[index];if(!item)break;const key=window.cartStockKey(item.name,item.warehouse);confirmAction('Remove this fragrance?','It will be removed from your order.','Remove item',()=>{saveCart(readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)!==key));renderProducts();});break;}
-    case 'clear-cart':if(!state.checking)confirmAction('Clear your order?','All items will be removed. You can start a new order any time.','Clear order',()=>{saveCart([]);renderProducts();setValidation('');});break;
+    case 'remove-line':{if(state.checking)break;const item=readCart()[index];if(!item)break;const key=window.cartStockKey(item.name,item.warehouse);confirmAction('Remove this fragrance?','It will be removed from your order.','Remove item',()=>{saveCart(readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)!==key));});break;}
+    case 'clear-cart':if(!state.checking)confirmAction('Clear your order?','All items will be removed. You can start a new order any time.','Clear order',()=>{saveCart([]);setValidation('');});break;
     case 'checkout':checkout();break;
   }
 });
@@ -392,8 +478,8 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   });
 });
 document.addEventListener('error',(event)=>{if(event.target.tagName==='IMG'){event.target.style.visibility='hidden';event.target.setAttribute('aria-hidden','true');}},true);
-window.addEventListener('storage',()=>{updateOrderUI();if(state.loaded)renderProducts();});
-window.addEventListener('pageshow',()=>{updateOrderUI();if(state.loaded)renderProducts();});
+window.addEventListener('storage',()=>{updateOrderUI();});
+window.addEventListener('pageshow',()=>{updateOrderUI();});
 window.addEventListener('resize',syncToastHost);
 function applyStorefrontCopy(){
   document.querySelectorAll('[data-whatsapp]').forEach(link=>link.href=`https://wa.me/${storefront.whatsappNumber}`);
