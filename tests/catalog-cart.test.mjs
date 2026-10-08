@@ -689,3 +689,30 @@ test('closing a cleared order returns focus to the header instead of the hidden 
   assert.equal(s.document.activeElement, header);
   assert.equal(element('mobile-order-bar').hidden, true);
 });
+test('product details show one main photo without a duplicate thumbnail', () => {
+  const { sandbox: s, element, setCart } = createContext();
+  const single = product();
+  const missing = product({ img: '' });
+  const coming = product({ stock: 0, inventory: 0, coming_soon_weight: 2 });
+  for (const p of [single, missing, coming]) {
+    s.renderDetail(p);
+    const html = element('product-detail').innerHTML;
+    assert.equal([...html.matchAll(/<img\b/g)].length, p.img ? 1 : 0);
+    assert.doesNotMatch(html, /detail-thumbnail/);
+    assert.match(html, /class="detail-photo"/);
+    assert.ok(html.includes(p.id));
+    if (!p.img) assert.match(html, /Product photo unavailable/);
+    if (p === coming) {
+      assert.match(html, /Arriving soon/);
+      assert.doesNotMatch(html, /data-action="add"/);
+    }
+  }
+  setCart([item({ quantity: 2 })]);
+  s.renderDetail(single);
+  const added = element('product-detail').innerHTML;
+  assert.equal([...added.matchAll(/<img\b/g)].length, 1);
+  assert.doesNotMatch(added, /detail-thumbnail/);
+  assert.match(added, /Quantity in order/);
+  assert.match(added, /2 in your order/);
+  assert.match(added, /View order/);
+});
