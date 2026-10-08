@@ -716,3 +716,29 @@ test('product details show one main photo without a duplicate thumbnail', () => 
   assert.match(added, /2 in your order/);
   assert.match(added, /View order/);
 });
+test('detail actions are separate from the scrollable product body', () => {
+  const { sandbox: s, element } = createContext();
+  s.renderDetail(product());
+  const html = element('product-detail').innerHTML;
+  assert.match(html, /class="detail-body"/);
+  assert.match(html, /<\/span><\/div><\/div><div class="detail-order-actions">/);
+  const actions = html.split('<div class="detail-order-actions">')[1];
+  assert.match(actions, /data-action="add"/);
+  assert.doesNotMatch(actions, /detail-photo|detail-copy|detail-title/);
+  assert.match(source('styles.css'), /grid-template-rows:minmax\(0,1fr\) auto/);
+  assert.match(source('styles.css'), /\.detail-body\{display:block;min-height:0;overflow-y:auto/);
+  assert.match(source('styles.css'), /padding:12px 16px calc\(12px \+ env\(safe-area-inset-bottom\)\)/);
+});
+test('detail quantity updates retain scroll while opening a product resets it', () => {
+  const { sandbox: s, element } = createContext();
+  const p = product();
+  const body = { scrollTop: 180 };
+  element('product-detail').querySelector = (selector) => selector === '.detail-body' ? body : null;
+  s.renderDetail(p);
+  assert.equal(body.scrollTop, 180);
+  body.scrollTop = 240;
+  s.perfumeDB = [p];
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  assert.equal(body.scrollTop, 0);
+  assert.equal(element('product-dialog').open, true);
+});

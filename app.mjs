@@ -54,7 +54,12 @@ function syncToastHost(){
   const host=dialogStack.filter(dialog=>dialog.open).at(-1)||document.body;
   const toast=$('toast');if(toast.parentElement!==host)host.append(toast);
   if(host===document.body){toast.style.left='';toast.style.bottom='';toast.style.maxWidth='';}
-  else{const box=host.getBoundingClientRect();toast.style.left=(box.left+box.width/2)+'px';toast.style.bottom=Math.max(12,innerHeight-box.bottom+14)+'px';toast.style.maxWidth=Math.max(0,box.width-32)+'px';}
+  else{
+    const box=host.getBoundingClientRect();
+    const actions=host.id==='product-dialog'&&window.matchMedia?.('(max-width:650px),(max-height:500px)').matches?host.querySelector('.detail-order-actions'):null;
+    const bottom=Math.max(12,innerHeight-box.bottom+14,actions?innerHeight-actions.getBoundingClientRect().top+8:0);
+    toast.style.left=(box.left+box.width/2)+'px';toast.style.bottom=bottom+'px';toast.style.maxWidth=Math.max(0,box.width-32)+'px';
+  }
 }
 
 window.showToast = function(message){clearTimeout(toastTimer);syncToastHost();$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,2600);};
@@ -207,12 +212,15 @@ function updateOrderUI(){
   if($('product-dialog').open){const product=getProduct(state.detailId);if(product)renderDetail(product);}
 }
 
-function renderDetail(product){
+function renderDetail(product,{resetScroll=false}={}){
   const focus=captureFocus($('product-detail'));
+  const scrollTop=resetScroll?0:($('product-detail').querySelector('.detail-body')?.scrollTop||0);
   const soon=isComingSoon(product);
   const warehouse=normalizeWarehouse(product.warehouse);
   const added=quantityInCart(product);
-  $('product-detail').innerHTML=`<div class="detail-layout"><div><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${esc(formatSize(product.ml))}</p><span class="sku">${esc(product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span>${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-add" data-action="open-cart">${icon('shopping-cart')}View order</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`Volume discounts apply at checkout. Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}</div></div>`;
+  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${esc(formatSize(product.ml))}</p><span class="sku">${esc(product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span></div></div><div class="detail-order-actions">${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-add" data-action="open-cart">${icon('shopping-cart')}View order</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`Volume discounts apply at checkout. Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}</div></div>`;
+  const body=$('product-detail').querySelector('.detail-body');
+  if(body)body.scrollTop=scrollTop;
   restoreFocus($('product-detail'),focus);
 }
 
@@ -227,7 +235,7 @@ function closeDialog(dialog){dialog.close();}
 
 function openProduct(id){
   const product=getProduct(id);if(!product)return;
-  state.detailId=stockKey(product);renderDetail(product);openDialog($('product-dialog'));
+  state.detailId=stockKey(product);renderDetail(product,{resetScroll:true});$('product-dialog').scrollTop=0;openDialog($('product-dialog'));
 }
 
 function cartLine(item,index){
