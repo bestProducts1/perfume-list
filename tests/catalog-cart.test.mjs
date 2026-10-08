@@ -714,7 +714,8 @@ test('product details show one main photo without a duplicate thumbnail', () => 
   assert.doesNotMatch(added, /detail-thumbnail/);
   assert.match(added, /Quantity in order/);
   assert.match(added, /2 in your order/);
-  assert.match(added, /View order/);
+  assert.match(added, /Continue shopping/);
+  assert.doesNotMatch(added, /View order|data-action="open-cart"/);
 });
 test('detail actions are separate from the scrollable product body', () => {
   const { sandbox: s, element } = createContext();
@@ -725,8 +726,10 @@ test('detail actions are separate from the scrollable product body', () => {
   const actions = html.split('<div class="detail-order-actions">')[1];
   assert.match(actions, /data-action="add"/);
   assert.doesNotMatch(actions, /detail-photo|detail-copy|detail-title/);
-  assert.match(source('styles.css'), /grid-template-rows:minmax\(0,1fr\) auto/);
-  assert.match(source('styles.css'), /\.detail-body\{display:block;min-height:0;overflow-y:auto/);
+  assert.match(source('styles.css'), /\.detail-layout\{display:flex;flex-direction:column;height:auto;max-height:/);
+  assert.match(source('styles.css'), /\.product-dialog\{height:fit-content;max-height:calc\(100dvh - 24px\)/);
+  assert.match(source('styles.css'), /\.detail-body\{display:block;flex:0 1 auto;min-height:0;overflow-y:auto/);
+  assert.match(source('styles.css'), /\.quantity-stepper button\{height:50px;min-width:48px;font-size:26px/);
   assert.match(source('styles.css'), /padding:12px 16px calc\(12px \+ env\(safe-area-inset-bottom\)\)/);
 });
 test('detail quantity updates retain scroll while opening a product resets it', () => {
@@ -741,4 +744,27 @@ test('detail quantity updates retain scroll while opening a product resets it', 
   s.openProduct(s.cartStockKey(p.id, p.warehouse));
   assert.equal(body.scrollTop, 0);
   assert.equal(element('product-dialog').open, true);
+});
+test('continuing shopping closes details without opening the cart or changing quantities', () => {
+  const { sandbox: s, element, cart, dispatchDocument } = createContext();
+  const p = product();
+  s.perfumeDB = [p];
+  const key = s.cartStockKey(p.id, p.warehouse);
+  s.openProduct(key);
+  s.addToOrder(key);
+  for (let i = 1; i < 4; i++) s.updateProductQuantity(key, 1);
+  const saved = cart();
+  const html = element('product-detail').innerHTML;
+  assert.match(html, /Continue shopping/);
+  assert.doesNotMatch(html, /View order|data-action="open-cart"/);
+  const button = { dataset: { action: 'close-product' } };
+  dispatchDocument('click', { target: { closest: (selector) => selector === '[data-action]' ? button : null } });
+  assert.equal(element('product-dialog').open, false);
+  assert.equal(element('cart-dialog').open, false);
+  assert.deepEqual(cart(), saved);
+  s.openProduct(key);
+  for (let i = 0; i < 4; i++) s.updateProductQuantity(key, -1);
+  assert.deepEqual(cart(), []);
+  assert.match(element('product-detail').innerHTML, /Add to order/);
+  assert.doesNotMatch(element('product-detail').innerHTML, /View order|Continue shopping/);
 });
