@@ -10,6 +10,8 @@ const CACHE_DURATION = 1 * 60 * 1000;
 const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Catalog_Data_V13";
 const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V13";
 const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V13";
+const CATALOG_DISCOUNT_TIERS = window.STOREFRONT_CONFIG.discountTiers;
+const SHIPPING_LABEL = window.STOREFRONT_CONFIG.shippingLabel;
 const CART_STORAGE_KEY = "bestProducts1SharedCartV3";
 const CART_RESET_KEY = "bestProducts1SharedCartResetV3";
 const MIN_ORDER_STOCK = 19;
@@ -184,6 +186,8 @@ function getOrderStockLimit(product) {
     "LOW / HIDDEN",
   ].includes(status);
   if (unavailable || !Number.isFinite(price) || price <= 0) return 0;
+  const comingSoonWeight = Number(product?.coming_soon_weight);
+  if (Number.isFinite(comingSoonWeight) && comingSoonWeight > 0 && !(stock >= MIN_ORDER_STOCK)) return 0;
   if (Number.isFinite(stock)) {
     return stock >= MIN_ORDER_STOCK ? Math.floor(stock) : 0;
   }
@@ -248,6 +252,10 @@ function runPageLogic() {
 
 function getShippingCost(totalQuantity) {
   return 0;
+}
+
+function formatDiscountPercent(percent) {
+  return String(Number((Number(percent) * 100).toFixed(2)));
 }
 
 function buildWhatsAppOrderMessage(items, discountTiers) {
@@ -365,7 +373,8 @@ function parseCSV(csvText) {
   if (value || row.length) { row.push(value.trim()); rows.push(row); }
   if (rows.length < 2) return [];
   const headers = rows[0].map((header) => header.trim().toLowerCase());
-  if (new Set(headers).size !== headers.length) throw new Error("Duplicate product columns.");
+  const namedHeaders = headers.filter(Boolean);
+  if (new Set(namedHeaders).size !== namedHeaders.length) throw new Error("Duplicate product columns.");
 
   return rows
     .slice(1)
@@ -375,6 +384,7 @@ function parseCSV(csvText) {
       if (values.length !== headers.length) throw new Error("Incomplete product row.");
 
       headers.forEach((header, index) => {
+        if (!header) return;
         let val = values[index] || "";
 
         // Keep empty numeric cells empty so pending prices and stock can be
