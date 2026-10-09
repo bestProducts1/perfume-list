@@ -838,6 +838,41 @@ test('product details show one main photo without a duplicate thumbnail', () => 
   assert.match(added, /Continue shopping/);
   assert.doesNotMatch(added, /View order|data-action="open-cart"/);
 });
+test('product details display the sheet audience beside the size with matching category icons', () => {
+  const { sandbox: s, element, setCart } = createContext();
+  for (const [value, label, symbol] of [
+    ['Men', 'Men', 'gender-male'], [' women ', 'Women', 'gender-female'],
+    ['UNISEX', 'Unisex', 'circles-relation'],
+  ]) {
+    const [p] = s.parseCSV(`sku,name,price,ml,stock,target\nTX-A055,New York Nights,33,100,19,${value}`);
+    assert.equal(p.gender.trim().toLowerCase(), label.toLowerCase());
+    setCart([]);
+    s.renderDetail(p);
+    const html = element('product-detail').innerHTML;
+    assert.ok(html.includes(`100ml<span class="detail-gender" aria-label="For ${label}">`));
+    assert.ok(html.includes(`ti ti-${symbol}`));
+    assert.match(html, new RegExp(`</i>${label}</span></p>`));
+    assert.match(html, /Add to order/);
+    assert.equal([...html.matchAll(/<img\b/g)].length, 0);
+    setCart([item({ quantity: 3 })]);
+    s.renderDetail(p);
+    assert.ok(element('product-detail').innerHTML.includes(`For ${label}`));
+    assert.match(element('product-detail').innerHTML, /3 in your order|Continue shopping/);
+  }
+  assert.match(s.detailGenderHtml({ target: 'Women' }), /Women/);
+  assert.match(source('styles.css'), /\.detail-copy \.product-size\{display:flex;align-items:center;gap:9px;flex-wrap:wrap\}/);
+});
+test('missing or unsupported audiences do not invent a gender or expose raw sheet values', () => {
+  const { sandbox: s, element } = createContext();
+  for (const value of ['', null, undefined, 'Unknown', 'constructor', '__proto__', '<img src=x onerror=alert(1)>']) {
+    assert.equal(s.detailGenderHtml({ gender: value }), '');
+    s.renderDetail(product({ gender: value }));
+    const html = element('product-detail').innerHTML;
+    assert.doesNotMatch(html, /detail-gender|onerror=alert/);
+    assert.match(html, /<p class="product-size">100ml<\/p>/);
+    assert.match(html, /Add to order/);
+  }
+});
 test('detail actions are separate from the scrollable product body', () => {
   const { sandbox: s, element } = createContext();
   s.renderDetail(product());
