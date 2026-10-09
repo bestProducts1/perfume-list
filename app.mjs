@@ -1,4 +1,4 @@
-import {selectProducts,isComingSoon,formatSize,getOrderSummary,normalizeText} from './catalog-model.mjs';
+import {selectProducts,isComingSoon,formatSize,getOrderSummary,normalizeText,validateOrderQuantity,getWarehouseSummaries} from './catalog-model.mjs?v=20261009-quantity-summary';
 
 const $ = (id) => document.getElementById(id);
 const cents = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100);
@@ -24,11 +24,18 @@ const returnFocus=new WeakMap();
 const dialogStack=[];
 const feedbackTimers=new WeakMap();
 const feedbackAnimations=new WeakMap();
+const quantityDrafts=new WeakMap();
 
 function captureFocus(root){
   const element=document.activeElement;
   if(!root.contains(element)||!element.dataset.action)return null;
-  return {action:element.dataset.action,id:element.dataset.id,index:element.dataset.index};
+  const marker={action:element.dataset.action,id:element.dataset.id,index:element.dataset.index};
+  if(element.dataset.action==='set-quantity'){
+    marker.selectionStart=element.selectionStart;marker.selectionEnd=element.selectionEnd;
+    const draft=quantityDrafts.get(element);
+    if(draft?.editing){marker.draft={...draft};marker.value=element.value;}
+  }
+  return marker;
 }
 
 function restoreFocus(root,marker){
@@ -41,7 +48,12 @@ function restoreFocus(root,marker){
     ||controls.find(el=>sameItem(el)&&quantityActions.includes(marker.action)&&quantityActions.includes(el.dataset.action)&&!el.disabled)
     ||controls.find(el=>sameItem(el)&&!el.disabled)
     ||controls.find(el=>!el.disabled);
-  replacement?.focus({preventScroll:true});
+  if(!replacement)return;
+  if(replacement.dataset.action==='set-quantity'&&marker.draft){
+    replacement.value=marker.value;quantityDrafts.set(replacement,{...marker.draft,selectOnClick:false});
+  }
+  if(document.activeElement!==replacement)replacement.focus({preventScroll:true});
+  if(replacement.dataset.action==='set-quantity'&&Number.isInteger(marker.selectionStart))replacement.setSelectionRange?.(marker.selectionStart,marker.selectionEnd);
 }
 
 function readCart(){return window.readStoredCart();}
@@ -49,6 +61,7 @@ function saveCart(cart){window.writeStoredCart(cart);updateOrderUI();}
 function products(){return window.perfumeDB || [];}
 function getProduct(reference){return products().find(p=>stockKey(p)===reference)||products().find(p=>String(p.id)===String(reference));}
 function quantityInCart(product){return readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)===stockKey(product)).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
+function quantityForReference(reference,cart=readCart()){return cart.filter(item=>window.cartStockKey(item.name,item.warehouse)===reference).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function remainingStock(product){return Math.max(0,window.getOrderStockLimit(product)-quantityInCart(product));}
 
 function syncToastHost(){
@@ -75,18 +88,34 @@ function emphasizeOrderControl(element,badge=false){
   if(animation)feedbackAnimations.set(element,animation);
 }
 
-function showQuantityFeedback(product,delta,quantity){
+function showQuantityFeedback(product,delta,quantity,{direct=false}={}){
   if(delta>0){
-    showToast(`Added 1 · ${product.id} now ${quantity} in your order`);
+    showToast(direct?`Quantity set · ${product.id} now ${quantity} in your order`:`Added ${delta} · ${product.id} now ${quantity} in your order`);
     const reference=stockKey(product);
     document.querySelectorAll('.quantity-stepper[data-stock-key]').forEach(element=>{if(element.dataset.stockKey===reference)emphasizeOrderControl(element);});
     emphasizeOrderControl($('cart-count'),true);
-  }else showToast(quantity>0?`Updated · ${product.id} now ${quantity} in your order`:`${product.id} removed from your order`);
+  }else showToast(quantity>0?`${direct?'Quantity set':'Updated'} · ${product.id} now ${quantity} in your order`:`${product.id} removed from your order`);
+}
+
+function quantityInputHtml(reference,label,amount){
+  return `<input class="quantity-input" type="text" inputmode="numeric" autocomplete="off" data-action="set-quantity" data-id="${esc(reference)}" value="${esc(amount)}" aria-label="Quantity in your order for ${esc(label)}" title="Click to enter total quantity" ${state.checking?'disabled':''}>`;
 }
 
 function stepper(product){
   const amount=quantityInCart(product);
-  return `<div class="quantity-stepper" data-stock-key="${esc(stockKey(product))}" aria-label="Order quantity for ${esc(product.name)}"><button type="button" data-action="product-minus" data-id="${esc(stockKey(product))}" aria-label="Decrease ${esc(product.name)} quantity in your order" ${state.checking?'disabled':''}>−</button><output aria-label="Quantity in your order">${amount}</output><button type="button" data-action="product-plus" data-id="${esc(stockKey(product))}" aria-label="Increase ${esc(product.name)} quantity in your order" ${state.checking||amount>=window.getOrderStockLimit(product)?'disabled':''}>+</button></div>`;
+  return `<div class="quantity-stepper" data-stock-key="${esc(stockKey(product))}" aria-label="Order quantity for ${esc(product.name)}"><button type="button" data-action="product-minus" data-id="${esc(stockKey(product))}" aria-label="Decrease ${esc(product.name)} quantity in your order" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(stockKey(product),product.name,amount)}<button type="button" data-action="product-plus" data-id="${esc(stockKey(product))}" aria-label="Increase ${esc(product.name)} quantity in your order" ${state.checking||amount>=window.getOrderStockLimit(product)?'disabled':''}>+</button></div>`;
+}
+
+function hasActiveQuantityDraft(root){
+  const input=document.activeElement;
+  return input?.dataset?.action==='set-quantity'&&root.contains(input)&&quantityDrafts.get(input)?.editing;
+}
+
+function syncQuantityInput(input,amount){
+  if(!input)return;
+  const draft=quantityDrafts.get(input);
+  if(!(document.activeElement===input&&draft?.editing))input.value=String(amount);
+  input.disabled=state.checking;
 }
 
 function imageHtml(product,className=''){
@@ -102,7 +131,7 @@ function productActionsHtml(product){
 
 function syncQuantityStepper(element,product){
   const amount=quantityInCart(product);
-  element.querySelector('output').textContent=amount;
+  syncQuantityInput(element.querySelector('.quantity-input'),amount);
   element.querySelector('[data-action="product-minus"]').disabled=state.checking;
   element.querySelector('[data-action="product-plus"]').disabled=state.checking||amount>=window.getOrderStockLimit(product);
 }
@@ -117,7 +146,7 @@ function updateProductCards(){
     const added=quantityInCart(product);
     const soon=isComingSoon(product);
     // Keep photos, titles and existing quantity buttons mounted during cart updates.
-    const matches=soon?actions.querySelector('.soon-note'):added?actions.querySelector('.quantity-stepper'):actions.querySelector('[data-action="add"]');
+    const matches=soon?actions.querySelector('.soon-note'):added||hasActiveQuantityDraft(actions)?actions.querySelector('.quantity-stepper'):actions.querySelector('[data-action="add"]');
     if(!matches)actions.innerHTML=productActionsHtml(product);
     const quantity=actions.querySelector('.quantity-stepper');
     if(quantity)syncQuantityStepper(quantity,product);
@@ -224,6 +253,80 @@ function updateProductQuantity(reference,delta){
   showQuantityFeedback(product||{id:existing.name,warehouse:existing.warehouse},delta,Math.max(0,quantity));
 }
 
+function setProductQuantity(reference,value){
+  const cart=readCart();
+  const matches=item=>window.cartStockKey(item.name,item.warehouse)===reference;
+  const existing=cart.find(matches);
+  const current=quantityForReference(reference,cart);
+  const product=getProduct(reference);
+  if(state.checking){showToast('Please wait while your order is being checked.');return false;}
+  const result=validateOrderQuantity(value,window.getOrderStockLimit(product));
+  if(!result.ok){
+    showToast(result.reason==='stock'?`This warehouse allows up to ${result.limit} pcs. Your saved quantity was not changed.`:'Enter a whole number of 0 or more. Your saved quantity was not changed.');
+    return false;
+  }
+  const quantity=result.quantity;
+  if(quantity===current)return true;
+  if(quantity===0){
+    if(!existing)return true;
+    const snapshot=JSON.stringify(cart.filter(matches));
+    confirmAction('Remove this fragrance?',`${existing.name} will be removed from your order.`, 'Remove item',()=>{
+      if(state.checking){showToast('Please wait while your order is being checked.');return;}
+      const latest=readCart();
+      if(JSON.stringify(latest.filter(matches))!==snapshot){showToast('This item changed in another window. Review its quantity before removing it.');updateOrderUI();return;}
+      saveCart(latest.filter(item=>!matches(item)));setValidation('');
+      showQuantityFeedback(product||{id:existing.name,warehouse:existing.warehouse},-current,0);
+    });
+    return true;
+  }
+  if(!product||isComingSoon(product)){showToast('This fragrance is not available to order yet.');return false;}
+  // Preserve the latest saved commercial data. Editing a total is not approval
+  // to replace its price, size or selected warehouse with the current feed.
+  const next=cart.filter(item=>!matches(item)||item===existing);
+  if(existing)existing.quantity=quantity;
+  else next.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
+  saveCart(next);setValidation('');
+  showQuantityFeedback(product,quantity-current,quantity,{direct:true});
+  return true;
+}
+
+function resetQuantityDraft(input){
+  const draft=quantityDrafts.get(input)||{};
+  draft.dirty=false;draft.wasPresent=quantityForReference(input.dataset.id)>0;
+  quantityDrafts.set(input,draft);
+  input.value=String(quantityForReference(input.dataset.id));
+}
+
+function commitQuantityInput(input,{blur=false}={}){
+  const draft=quantityDrafts.get(input)||{editing:document.activeElement===input,dirty:true,wasPresent:false};
+  if(blur)draft.editing=false;
+  quantityDrafts.set(input,draft);
+  if(!draft.dirty){
+    resetQuantityDraft(input);updateOrderUI();
+    return;
+  }
+  const value=input.value;
+  const current=quantityForReference(input.dataset.id);
+  draft.dirty=false;
+  if(draft.wasPresent&&current===0){
+    draft.editing=false;resetQuantityDraft(input);updateOrderUI();
+    showToast('This item was removed in another window. Add it again before setting a quantity.');return;
+  }
+  const product=getProduct(input.dataset.id);
+  const validated=validateOrderQuantity(value,window.getOrderStockLimit(product));
+  // A zero draft must not remain visible after cancelling the removal dialog.
+  input.value=validated.ok&&validated.quantity>0?String(validated.quantity):String(current);
+  if(validated.ok&&validated.quantity===0&&current>0){
+    draft.editing=false;
+    const parent=input.closest?.('.quantity-stepper')||input.parentElement;
+    const minus=parent?.querySelector('[data-action="product-minus"]')||parent?.querySelector('[data-action="cart-minus"]');
+    if(minus&&!minus.disabled)minus.focus({preventScroll:true});
+    else input.blur?.();
+  }
+  const committed=setProductQuantity(input.dataset.id,value);
+  if(!committed){resetQuantityDraft(input);updateOrderUI();}
+}
+
 function addToOrder(id){
   if(state.checking)return;
   const product=getProduct(id);if(!product)return;
@@ -242,6 +345,8 @@ function updateOrderUI(){
   $('mobile-order-bar').hidden=!summary.qty;
   $('mobile-order-total').textContent=money(summary.totalAmount);
   $('mobile-order-quantity').textContent=`${summary.qty} ${summary.qty===1?'item':'items'} · ${storefront.freeShipping?'free shipping':'excl. shipping'}`;
+  $('mobile-order-savings').hidden=summary.discountPercent<=0;
+  $('mobile-order-savings').textContent=summary.discountPercent>0?`${window.formatDiscountPercent(summary.discountPercent)}% off · Saved ${money(summary.discountAmount)}`:'';
   document.body.classList.toggle('has-order',summary.qty>0);
   updateProductCards();
   if($('cart-dialog').open)renderCart();
@@ -262,7 +367,7 @@ function updateDetailOrderActions(product){
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
   const add=actions.querySelector('.detail-add');
-  const matches=soon?add&&!add.dataset.action:added?actions.querySelector('.quantity-stepper'):add?.dataset.action==='add';
+  const matches=soon?add&&!add.dataset.action:added||hasActiveQuantityDraft(actions)?actions.querySelector('.quantity-stepper'):add?.dataset.action==='add';
   if(!matches)actions.innerHTML=detailOrderActionsHtml(product);
   const quantity=actions.querySelector('.quantity-stepper');
   if(quantity)syncQuantityStepper(quantity,product);
@@ -295,7 +400,7 @@ function renderDetail(product,{resetScroll=false}={}){
 
 function openDialog(dialog){
   returnFocus.set(dialog,document.activeElement);
-  if(!dialog.open){dialog.showModal();dialogStack.push(dialog);}
+  if(!dialog.open){dialog.showModal();if(!dialogStack.includes(dialog))dialogStack.push(dialog);}
   document.body.style.overflow='hidden';
   syncToastHost();
 }
@@ -312,7 +417,18 @@ function cartLine(item,index){
   const allocated=product?quantityInCart(product):0;
   const max=window.getOrderStockLimit(product);
   const title=String(item.caption||item.name).replace(new RegExp(`^${String(item.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*-\\s*`),'');
-  return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(formatSize(item.ml))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(window.cartStockKey(item.name,item.warehouse))}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button><output aria-label="Order quantity">${esc(item.quantity)}</output><button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
+  const reference=window.cartStockKey(item.name,item.warehouse);
+  return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(formatSize(item.ml))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(reference)}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(reference,title,quantityForReference(reference))}<button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
+}
+
+function warehouseSummaryText(summary){return `${summary.qty} ${summary.qty===1?'pc':'pcs'} · ${money(summary.subtotal)} before discount`;}
+
+function updateWarehouseHeadings(cart){
+  const summaries=new Map(getWarehouseSummaries(cart).map(summary=>[summary.warehouse,summary]));
+  $('cart-body').querySelectorAll('.warehouse-section-title').forEach(heading=>{
+    const summary=summaries.get(heading.dataset.warehouse)||{qty:0,subtotal:0};
+    heading.querySelector('.warehouse-section-summary').textContent=warehouseSummaryText(summary);
+  });
 }
 
 function cartSummaryHtml(summary){
@@ -338,16 +454,18 @@ function renderCart(){
       const item=cart[Number(minus.dataset.index)];
       const product=window.getCartProduct(item,products());
       const allocated=product?quantityInCart(product):0;
-      line.querySelector('output').textContent=item.quantity;
+      syncQuantityInput(line.querySelector('.quantity-input'),quantityForReference(window.cartStockKey(item.name,item.warehouse),cart));
       minus.disabled=state.checking;
       line.querySelector('[data-action="cart-plus"]').disabled=state.checking||allocated>=window.getOrderStockLimit(product);
       line.querySelector('[data-action="remove-line"]').disabled=state.checking;
     });
+    updateWarehouseHeadings(cart);
     orderSummary.innerHTML=cartSummaryHtml(summary);
     restoreFocus($('cart-body'),focus);return;
   }
   const groups=new Map();cart.forEach((item,index)=>{const code=normalizeWarehouse(item.warehouse);if(!groups.has(code))groups.set(code,[]);groups.get(code).push({item,index});});
-  let rows='';groups.forEach((items,code)=>{rows+=`<h3 class="warehouse-section-title">${esc(code)} Warehouse</h3>`+items.map(({item,index})=>cartLine(item,index)).join('');});
+  const warehouseSummaries=new Map(getWarehouseSummaries(cart).map(summary=>[summary.warehouse,summary]));
+  let rows='';groups.forEach((items,code)=>{rows+=`<h3 class="warehouse-section-title" data-warehouse="${esc(code)}"><span class="warehouse-section-name">${esc(code)} Warehouse</span><span class="warehouse-section-summary">${warehouseSummaryText(warehouseSummaries.get(code)||{qty:0,subtotal:0})}</span></h3>`+items.map(({item,index})=>cartLine(item,index)).join('');});
   $('cart-body').innerHTML=`${rows}<section class="order-summary" aria-label="Order summary">${cartSummaryHtml(summary)}</section>`;
   renderedCartSignature=signature;
   restoreFocus($('cart-body'),focus);
@@ -426,6 +544,11 @@ document.addEventListener('click',(event)=>{
   const target=event.target.closest('[data-action]');if(!target)return;
   const id=target.dataset.id;const index=Number(target.dataset.index);
   switch(target.dataset.action){
+    case 'set-quantity':{
+      const draft=quantityDrafts.get(target);
+      if(draft?.selectOnClick){target.select?.();draft.selectOnClick=false;}
+      break;
+    }
     case 'open-menu':openDialog($('menu-dialog'));break;
     case 'close-menu':closeDialog($('menu-dialog'));break;
     case 'focus-search':$('catalog').scrollIntoView();$('search-input').focus({preventScroll:true});break;
@@ -445,6 +568,31 @@ document.addEventListener('click',(event)=>{
     case 'remove-line':{if(state.checking)break;const item=readCart()[index];if(!item)break;const key=window.cartStockKey(item.name,item.warehouse);confirmAction('Remove this fragrance?','It will be removed from your order.','Remove item',()=>{saveCart(readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)!==key));});break;}
     case 'clear-cart':if(!state.checking)confirmAction('Clear your order?','All items will be removed. You can start a new order any time.','Clear order',()=>{saveCart([]);setValidation('');});break;
     case 'checkout':checkout();break;
+  }
+});
+
+document.addEventListener('focusin',event=>{
+  const input=event.target;if(input?.dataset?.action!=='set-quantity')return;
+  const previous=quantityDrafts.get(input);
+  if(previous?.editing)return;
+  quantityDrafts.set(input,{editing:true,dirty:false,wasPresent:quantityForReference(input.dataset.id)>0,selectOnClick:true});
+});
+document.addEventListener('input',event=>{
+  const input=event.target;if(input?.dataset?.action!=='set-quantity')return;
+  const draft=quantityDrafts.get(input)||{editing:true,wasPresent:quantityForReference(input.dataset.id)>0,selectOnClick:false};
+  draft.dirty=true;quantityDrafts.set(input,draft);
+});
+document.addEventListener('focusout',event=>{
+  const input=event.target;if(input?.dataset?.action==='set-quantity')commitQuantityInput(input,{blur:true});
+});
+document.addEventListener('keydown',event=>{
+  const input=event.target;if(input?.dataset?.action!=='set-quantity')return;
+  if(event.key==='Enter'){
+    event.preventDefault();event.stopPropagation?.();commitQuantityInput(input);
+    if(document.activeElement===input)input.blur();
+  }else if(event.key==='Escape'){
+    event.preventDefault();event.stopPropagation?.();resetQuantityDraft(input);updateOrderUI();
+    if(document.activeElement===input)input.blur();
   }
 });
 
@@ -470,6 +618,8 @@ document.addEventListener('keydown',event=>{
 document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.addEventListener('click',event=>{if(event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close();}});
   dialog.addEventListener('close',()=>{
+    // Native close events are queued; an earlier close must not dismiss a newly reopened dialog.
+    if(dialog.open)return;
     const index=dialogStack.indexOf(dialog);if(index>=0)dialogStack.splice(index,1);
     const stillOpen=dialogStack.filter(el=>el.open);
     if(!stillOpen.length)document.body.style.overflow='';

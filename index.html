@@ -8,10 +8,10 @@
   <link rel="icon" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/brand-mark.png">
   <link rel="stylesheet" href="assets/tabler-icons.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261009-detailgender">
+  <link rel="stylesheet" href="styles.css?v=20261009-quantity-summary">
   <script src="storefront-config.js?v=20261009" defer></script>
   <script src="db.js?v=20261009" defer></script>
-  <script type="module" src="app.mjs?v=20261009-detailgender"></script>
+  <script type="module" src="app.mjs?v=20261009-quantity-summary"></script>
   <script type="module" src="brand-picker.mjs?v=20261009-orderbar"></script>
   <script type="module" src="select-menu.mjs?v=20261009"></script>
 </head>
@@ -59,7 +59,7 @@
     <footer class="site-footer"><span>ScentoryHub</span><a data-whatsapp href="#" target="_blank" rel="noopener">Questions? Contact us <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a></footer>
   </main>
 
-  <div id="mobile-order-bar" class="mobile-order-bar" hidden><button type="button" data-action="open-cart"><span><strong id="mobile-order-total">$0.00</strong><small id="mobile-order-quantity">0 items · excl. shipping</small></span><span>View order <i class="ti ti-arrow-right" aria-hidden="true"></i></span></button></div>
+  <div id="mobile-order-bar" class="mobile-order-bar" hidden><button type="button" data-action="open-cart"><span><strong id="mobile-order-total">$0.00</strong><small id="mobile-order-quantity">0 items · excl. shipping</small><small id="mobile-order-savings" hidden></small></span><span>View order <i class="ti ti-arrow-right" aria-hidden="true"></i></span></button></div>
 
   <dialog id="product-dialog" class="product-dialog" aria-labelledby="detail-title"><button type="button" class="dialog-close icon-button" aria-label="Close product details" data-action="close-product"><i class="ti ti-x" aria-hidden="true"></i></button><div id="product-detail"></div></dialog>
   <dialog id="cart-dialog" class="cart-dialog" aria-labelledby="cart-title"><div class="drawer-heading"><div><span class="eyebrow">READY WHEN YOU ARE</span><h2 id="cart-title">Your order <span id="drawer-cart-count">(0)</span></h2></div><button type="button" class="icon-button" aria-label="Close your order" data-action="close-cart"><i class="ti ti-x" aria-hidden="true"></i></button></div><div id="cart-body"></div><div id="cart-validation" class="validation-message" role="status" aria-live="polite" hidden></div><div id="cart-actions" class="drawer-actions" hidden><button id="checkout-button" class="primary-button" type="button" data-action="checkout">Proceed to checkout <i class="ti ti-arrow-right" aria-hidden="true"></i></button><button class="text-button clear-cart-button" type="button" data-action="clear-cart">Clear order</button></div></dialog>

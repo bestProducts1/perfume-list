@@ -83,6 +83,18 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
       },
       appendChild(child) { el.append(child); return child; },
       focus() { if (document) document.activeElement = el; },
+      blur() {
+        if (document?.activeElement !== el) return;
+        document.activeElement = document.body;
+        document.dispatchEvent({ type: 'focusout', target: el });
+      },
+      select() { el.selectionStart = 0; el.selectionEnd = el.value.length; },
+      setSelectionRange(start, end) { el.selectionStart = start; el.selectionEnd = end; },
+      closest(selector) {
+        if (selector === '[data-action]') return el.dataset.action ? el : el.parentElement?.closest(selector) || null;
+        if (selector === '.quantity-stepper') return classes.has('quantity-stepper') ? el : el.parentElement?.closest(selector) || null;
+        return null;
+      },
       contains(target) { return target === el || el.children.some((child) => child === target || child.contains?.(target)); },
       matches: (selector) => selector === ':disabled' && el.disabled,
       querySelector: () => null,
@@ -183,9 +195,12 @@ function mountQuantityActions(context, p, { detail = false } = {}) {
     const create = (name) => element(`${suffix}-${name}-${revision}`);
     if (value.includes('quantity-stepper')) {
       nodes.stepper = create('stepper');
+      nodes.stepper.classList.add('quantity-stepper');
       nodes.stepper.dataset.stockKey = s.cartStockKey(p.id, p.warehouse);
-      nodes.output = create('output');
-      nodes.output.textContent = Number(value.match(/<output\b[^>]*>(\d+)<\/output>/)?.[1] || 0);
+      nodes.input = create('input');
+      nodes.input.dataset = { action: 'set-quantity', id: s.cartStockKey(p.id, p.warehouse) };
+      nodes.input.value = value.match(/<input\b[^>]*value="(\d+)"/)?.[1] || '0';
+      nodes.input.disabled = /<input\b[^>]*\bdisabled/.test(value);
       for (const action of ['product-minus', 'product-plus']) {
         const button = create(action);
         button.dataset = { action, id: s.cartStockKey(p.id, p.warehouse) };
@@ -193,8 +208,8 @@ function mountQuantityActions(context, p, { detail = false } = {}) {
         nodes[action] = button;
         nodes.stepper.append(button);
       }
-      nodes.stepper.append(nodes.output);
-      nodes.stepper.querySelector = (selector) => selector === 'output' ? nodes.output
+      nodes.stepper.append(nodes.input);
+      nodes.stepper.querySelector = (selector) => selector === '.quantity-input' ? nodes.input
         : selector === '[data-action="product-minus"]' ? nodes['product-minus']
         : selector === '[data-action="product-plus"]' ? nodes['product-plus'] : null;
       actions.append(nodes.stepper);
@@ -222,7 +237,7 @@ function mountQuantityActions(context, p, { detail = false } = {}) {
     : selector === '.in-order' ? nodes.inOrder || null
     : selector === '.soon-note' ? nodes.soon || null : null;
   actions.querySelectorAll = (selector) => selector === '[data-action]'
-    ? [nodes.add, nodes['product-minus'], nodes['product-plus'], nodes.continue].filter((node) => node?.dataset.action) : [];
+    ? [nodes.add, nodes['product-minus'], nodes.input, nodes['product-plus'], nodes.continue].filter((node) => node?.dataset.action) : [];
   actions.innerHTML = detail ? s.detailOrderActionsHtml(p) : s.productActionsHtml(p);
   return { actions, get nodes() { return nodes; } };
 }
@@ -246,6 +261,7 @@ function mountStableCard(context, p) {
 function mountStableDetail(context, p) {
   const { element } = context;
   const root = element('product-detail');
+  element('product-dialog').append(root);
   const body = element('detail-body-fixture');
   const photo = element('detail-photo-fixture');
   body.scrollTop = 180; body.append(photo);
@@ -258,31 +274,61 @@ function mountStableDetail(context, p) {
 }
 
 function mountStableCart(context) {
-  const { element, cart } = context;
+  const { sandbox: s, element, cart } = context;
   const root = element('cart-body');
+  element('cart-dialog').append(root);
   const summary = element('cart-summary-fixture');
   const lines = cart().map((saved, index) => {
     const line = element(`cart-line-fixture-${index}`);
     const photo = element(`cart-photo-fixture-${index}`);
-    const output = element(`cart-output-fixture-${index}`); output.textContent = saved.quantity;
+    const input = element(`cart-input-fixture-${index}`); input.value = String(saved.quantity);
+    input.dataset = { action: 'set-quantity', id: s.cartStockKey(saved.name, saved.warehouse) };
     const controls = {};
     for (const action of ['cart-minus', 'cart-plus', 'remove-line']) {
       controls[action] = element(`${action}-fixture-${index}`);
       controls[action].dataset = { action, index: String(index) };
       line.append(controls[action]);
     }
-    line.append(photo); line.append(output); root.append(line);
-    line.querySelector = (selector) => selector === 'img' ? photo : selector === 'output' ? output
+    line.append(photo); line.append(input); root.append(line);
+    line.querySelector = (selector) => selector === 'img' ? photo : selector === '.quantity-input' ? input
       : selector === '[data-action="cart-minus"]' ? controls['cart-minus']
       : selector === '[data-action="cart-plus"]' ? controls['cart-plus']
       : selector === '[data-action="remove-line"]' ? controls['remove-line'] : null;
-    return { line, photo, output, ...controls };
+    return { line, photo, input, ...controls };
+  });
+  const headings = model.getWarehouseSummaries(cart()).map((warehouse, index) => {
+    const heading = element(`warehouse-heading-fixture-${index}`);
+    const summary = element(`warehouse-summary-fixture-${index}`);
+    heading.dataset.warehouse = warehouse.warehouse;
+    summary.textContent = s.warehouseSummaryText(warehouse);
+    heading.append(summary); root.append(heading);
+    heading.querySelector = (selector) => selector === '.warehouse-section-summary' ? summary : null;
+    return { heading, summary };
   });
   root.append(summary);
   root.querySelector = (selector) => selector === '.order-summary' ? summary : null;
   root.querySelectorAll = (selector) => selector === '.cart-line' ? lines.map(({ line }) => line)
-    : selector === '[data-action]' ? lines.flatMap((line) => [line['cart-minus'], line['cart-plus'], line['remove-line']]) : [];
-  return { root, summary, lines };
+    : selector === '.warehouse-section-title' ? headings.map(({ heading }) => heading)
+    : selector === '[data-action]' ? lines.flatMap((line) => [line['cart-minus'], line.input, line['cart-plus'], line['remove-line']]) : [];
+  return { root, summary, lines, headings };
+}
+
+function editQuantity(context, input, value) {
+  input.focus();
+  context.dispatchDocument('focusin', { target: input });
+  input.value = value;
+  input.setSelectionRange(value.length, value.length);
+  context.dispatchDocument('input', { target: input });
+}
+
+function quantityKey(context, input, key) {
+  const result = { prevented: false, stopped: false };
+  context.dispatchDocument('keydown', {
+    target: input, key,
+    preventDefault() { result.prevented = true; },
+    stopPropagation() { result.stopped = true; },
+  });
+  return result;
 }
 
 test('stock below 19 and unknown prices are blocked', () => {
@@ -931,19 +977,19 @@ test('syncing a quantity stepper keeps its controls and updates inventory and ch
   const p = product();
   s.perfumeDB = [p]; setCart([item({ quantity: 7 })]);
   const mounted = mountQuantityActions(context, p);
-  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  const { stepper, input, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
   const writes = mounted.actions.innerHTMLWrites;
   s.syncQuantityStepper(stepper, p);
-  assert.equal(output.textContent, 7);
+  assert.equal(input.value, '7');
   assert.equal(plus.disabled, false); assert.equal(minus.disabled, false);
   setCart([item({ quantity: 19 })]); s.syncQuantityStepper(stepper, p);
-  assert.equal(output.textContent, 19); assert.equal(plus.disabled, true); assert.equal(minus.disabled, false);
+  assert.equal(input.value, '19'); assert.equal(plus.disabled, true); assert.equal(minus.disabled, false);
   evaluate('state.checking = true'); s.syncQuantityStepper(stepper, p);
   assert.equal(plus.disabled, true); assert.equal(minus.disabled, true);
   evaluate('state.checking = false'); setCart([item({ quantity: 18 })]); s.syncQuantityStepper(stepper, p);
-  assert.equal(output.textContent, 18); assert.equal(plus.disabled, false); assert.equal(minus.disabled, false);
+  assert.equal(input.value, '18'); assert.equal(plus.disabled, false); assert.equal(minus.disabled, false);
   assert.equal(mounted.actions.innerHTMLWrites, writes);
-  assert.equal(stepper.querySelector('output'), output);
+  assert.equal(stepper.querySelector('.quantity-input'), input);
   assert.equal(stepper.querySelector('[data-action="product-plus"]'), plus);
   assert.equal(stepper.querySelector('[data-action="product-minus"]'), minus);
 });
@@ -954,17 +1000,17 @@ test('homepage repeated plus and minus preserve photo, controls, focus and colle
   const p = product();
   s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
   const mounted = mountStableCard(context, p);
-  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  const { stepper, input, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
   mounted.root.innerHTML = '<section>Stable collection and image</section>';
   const rootHTML = mounted.root.innerHTML, rootWrites = mounted.root.innerHTMLWrites;
   const actionWrites = mounted.actions.innerHTMLWrites;
   s.document.activeElement = plus;
   s.renderProducts = () => { throw new Error('Quantity updates must not rerender the collection'); };
   for (const delta of [1, 1, -1, 1]) s.updateProductQuantity(s.cartStockKey(p.id, p.warehouse), delta);
-  assert.equal(cart()[0].quantity, 3); assert.equal(output.textContent, 3);
+  assert.equal(cart()[0].quantity, 3); assert.equal(input.value, '3');
   assert.equal(mounted.inOrder.textContent, '3 in your order');
   assert.equal(mounted.card.querySelector('img'), mounted.photo);
-  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.output, output);
+  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.input, input);
   assert.equal(mounted.nodes['product-plus'], plus); assert.equal(mounted.nodes['product-minus'], minus);
   assert.equal(mounted.actions.innerHTMLWrites, actionWrites);
   assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
@@ -1008,7 +1054,7 @@ test('incremental card updates isolate equal SKU values in separate warehouses',
   const first = mountStableCard(context, tx), second = mountStableCard(context, ne);
   const secondStepper = second.nodes.stepper, secondWrites = second.actions.innerHTMLWrites;
   s.updateProductQuantity(s.cartStockKey(tx.id, tx.warehouse), 1);
-  assert.equal(first.nodes.output.textContent, 3); assert.equal(second.nodes.output.textContent, 4);
+  assert.equal(first.nodes.input.value, '3'); assert.equal(second.nodes.input.value, '4');
   assert.equal(first.inOrder.textContent, '3 in your order'); assert.equal(second.inOrder.textContent, '4 in your order');
   assert.equal(second.nodes.stepper, secondStepper); assert.equal(second.actions.innerHTMLWrites, secondWrites);
   assert.equal(first.card.querySelector('img'), first.photo); assert.equal(second.card.querySelector('img'), second.photo);
@@ -1020,15 +1066,15 @@ test('detail repeated quantity changes leave photo, scroll body and footer contr
   const p = product(); s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
   s.openProduct(s.cartStockKey(p.id, p.warehouse));
   const mounted = mountStableDetail(context, p);
-  const { stepper, output, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
+  const { stepper, input, 'product-plus': plus, 'product-minus': minus } = mounted.nodes;
   const rootHTML = mounted.root.innerHTML, rootWrites = mounted.root.innerHTMLWrites;
   const actionWrites = mounted.actions.innerHTMLWrites;
   s.document.activeElement = plus;
   s.renderProducts = () => { throw new Error('Detail quantity must not redraw the collection'); };
   s.renderDetail = () => { throw new Error('Detail quantity must not recreate product images'); };
   for (const delta of [1, 1, -1]) s.updateProductQuantity(s.cartStockKey(p.id, p.warehouse), delta);
-  assert.equal(output.textContent, 2); assert.equal(mounted.nodes.inOrder.textContent, '2 in your order');
-  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.output, output);
+  assert.equal(input.value, '2'); assert.equal(mounted.nodes.inOrder.textContent, '2 in your order');
+  assert.equal(mounted.nodes.stepper, stepper); assert.equal(mounted.nodes.input, input);
   assert.equal(mounted.nodes['product-plus'], plus); assert.equal(mounted.nodes['product-minus'], minus);
   assert.equal(mounted.actions.innerHTMLWrites, actionWrites);
   assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
@@ -1048,7 +1094,7 @@ test('detail first Add and removal remount only its action footer', () => {
   s.renderDetail = () => { throw new Error('Detail Add must not recreate the product photo'); };
   const key = s.cartStockKey(p.id, p.warehouse);
   s.addToOrder(key);
-  assert.equal(cart()[0].quantity, 1); assert.equal(mounted.nodes.output.textContent, 1);
+  assert.equal(cart()[0].quantity, 1); assert.equal(mounted.nodes.input.value, '1');
   assert.equal(mounted.actions.innerHTMLWrites, writes + 1);
   assert.equal(s.document.activeElement, mounted.nodes['product-plus']);
   s.updateProductQuantity(key, -1);
@@ -1070,9 +1116,9 @@ test('storage and pageshow sync quantities without redrawing product images or o
   s.renderProducts = () => { throw new Error('Storage/pageshow must not redraw product cards'); };
   s.renderDetail = () => { throw new Error('Storage/pageshow must not recreate product details'); };
   setCart([item({ quantity: 5 })]); dispatchWindow('storage', { key: storageKeys.cart });
-  assert.equal(card.nodes.output.textContent, 5); assert.equal(detail.nodes.output.textContent, 5);
+  assert.equal(card.nodes.input.value, '5'); assert.equal(detail.nodes.input.value, '5');
   setCart([item({ quantity: 6 })]); dispatchWindow('pageshow');
-  assert.equal(card.nodes.output.textContent, 6); assert.equal(detail.nodes.output.textContent, 6);
+  assert.equal(card.nodes.input.value, '6'); assert.equal(detail.nodes.input.value, '6');
   assert.equal(card.nodes.stepper, cardStepper); assert.equal(detail.nodes.stepper, detailStepper);
   assert.equal(card.root.innerHTMLWrites, cardWrites); assert.equal(detail.root.innerHTMLWrites, detailWrites);
   assert.equal(card.card.querySelector('img'), card.photo); assert.equal(detail.root.querySelector('img'), detail.photo);
@@ -1108,20 +1154,20 @@ test('cart quantity and checking updates preserve row photos and controls while 
   const rootWrites = mounted.root.innerHTMLWrites, summaryWrites = mounted.summary.innerHTMLWrites;
   s.document.activeElement = row['cart-plus'];
   for (let quantity = 2; quantity <= 19; quantity++) s.updateCartQuantity(0, 1);
-  assert.equal(cart()[0].quantity, 19); assert.equal(row.output.textContent, 19);
+  assert.equal(cart()[0].quantity, 19); assert.equal(row.input.value, '19');
   assert.equal(row['cart-plus'].disabled, true); assert.equal(row['cart-minus'].disabled, false);
   assert.equal(mounted.root.innerHTMLWrites, rootWrites); assert.equal(mounted.root.innerHTML, rootHTML);
   assert.equal(mounted.summary.innerHTMLWrites, summaryWrites + 18);
   const expected = model.getOrderSummary(cart(), site.tiers);
   assert.ok(mounted.summary.innerHTML.includes(`Items (${expected.qty})`));
   assert.ok(mounted.summary.innerHTML.includes('$' + expected.totalAmount.toFixed(2)));
-  assert.equal(row.line.querySelector('img'), row.photo); assert.equal(row.line.querySelector('output'), row.output);
+  assert.equal(row.line.querySelector('img'), row.photo); assert.equal(row.line.querySelector('.quantity-input'), row.input);
   assert.equal(row.line.querySelector('[data-action="cart-plus"]'), row['cart-plus']);
   assert.equal(row.line.querySelector('[data-action="cart-minus"]'), row['cart-minus']);
   evaluate('state.checking = true'); s.renderCart();
   assert.equal(row['cart-plus'].disabled, true); assert.equal(row['cart-minus'].disabled, true); assert.equal(row['remove-line'].disabled, true);
   evaluate('state.checking = false'); s.updateCartQuantity(0, -1);
-  assert.equal(row.output.textContent, 18); assert.equal(row['cart-plus'].disabled, false); assert.equal(row['cart-minus'].disabled, false);
+  assert.equal(row.input.value, '18'); assert.equal(row['cart-plus'].disabled, false); assert.equal(row['cart-minus'].disabled, false);
   s.perfumeDB = []; s.renderCart();
   assert.equal(row['cart-plus'].disabled, true, 'a removed product remains unable to increase in the incremental path');
   assert.equal(row['cart-minus'].disabled, false); assert.equal(row['remove-line'].disabled, false);
@@ -1156,4 +1202,220 @@ test('cart metadata, row order and row count changes invalidate the incremental 
   setCart([]); s.renderCart();
   assert.equal(mounted.root.innerHTMLWrites, ++writes); assert.match(mounted.root.innerHTML, /Your order starts here/);
   assert.equal(element('cart-actions').hidden, true);
+});
+
+test('quantity validation accepts only safe whole-number totals within the warehouse stock limit', () => {
+  for (const value of ['', ' ', '-1', '1.5', '1e2', 'Infinity', 'NaN', '+2', '2,000', '9007199254740992']) {
+    assert.deepEqual(model.validateOrderQuantity(value, 100), { ok: false, reason: 'integer' }, value);
+  }
+  assert.deepEqual(model.validateOrderQuantity('21', 20), { ok: false, reason: 'stock', limit: 20 });
+  assert.deepEqual(model.validateOrderQuantity('00012', 20), { ok: true, quantity: 12 });
+  assert.deepEqual(model.validateOrderQuantity(' 20 ', 20), { ok: true, quantity: 20 });
+  assert.deepEqual(model.validateOrderQuantity('0', 0), { ok: true, quantity: 0 });
+  assert.deepEqual(model.validateOrderQuantity('9007199254740991'), { ok: true, quantity: Number.MAX_SAFE_INTEGER });
+});
+
+test('quantity inputs expose total quantity, numeric keyboard and labels in all order presentations', () => {
+  const { sandbox: s, setCart, evaluate } = createContext();
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 7 })]);
+  const key = s.cartStockKey(p.id, p.warehouse);
+  for (const html of [s.productActionsHtml(p), s.detailOrderActionsHtml(p), s.cartLine(item({ quantity: 7 }), 0)]) {
+    assert.match(html, /class="quantity-input" type="text" inputmode="numeric"/);
+    assert.ok(html.includes(`data-action="set-quantity" data-id="${key}" value="7"`));
+    assert.match(html, /aria-label="Quantity in your order for [^"]+"/);
+    assert.match(html, /title="Click to enter total quantity"/);
+    assert.doesNotMatch(html, /autofocus|<output/);
+  }
+  evaluate("state.view = 'list'");
+  assert.match(s.productCard(p), /class="quantity-input"/);
+});
+
+test('typing drafts does not save; Enter sets a total once, preserves images and dismisses the keyboard', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, evaluate } = context;
+  const p = product({ stock: 100 }); s.perfumeDB = [p]; setCart([item({ quantity: 3 })]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p);
+  const { input, stepper } = mounted.nodes;
+  const writes = [mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites];
+  let saves = 0;
+  const save = s.writeStoredCart;
+  s.writeStoredCart = (...args) => { saves++; return save(...args); };
+  editQuantity(context, input, '2');
+  assert.equal(cart()[0].quantity, 3); assert.equal(saves, 0);
+  input.value = '20'; context.dispatchDocument('input', { target: input });
+  assert.equal(cart()[0].quantity, 3); assert.equal(saves, 0);
+  assert.deepEqual(quantityKey(context, input, 'Enter'), { prevented: true, stopped: true });
+  assert.equal(cart()[0].quantity, 20); assert.equal(input.value, '20'); assert.equal(saves, 1);
+  assert.match(element('toast').textContent, /Quantity set.*now 20 in your order/);
+  assert.doesNotMatch(element('toast').textContent, /Added 1/);
+  assert.notEqual(s.document.activeElement, input);
+  assert.equal(mounted.nodes.input, input); assert.equal(mounted.nodes.stepper, stepper);
+  assert.equal(mounted.card.querySelector('img'), mounted.photo);
+  assert.deepEqual([mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites], writes);
+  context.dispatchDocument('focusout', { target: input });
+  assert.equal(saves, 1, 'Enter followed by blur must not save twice');
+});
+
+test('blurring a detail draft sets its total without replacing the photo, footer controls or scroll', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item()]); evaluate('state.loaded = true');
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const mounted = mountStableDetail(context, p), input = mounted.nodes.input;
+  const writes = [mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites];
+  editQuantity(context, input, '12'); input.blur();
+  assert.equal(cart()[0].quantity, 12); assert.equal(input.value, '12');
+  assert.equal(mounted.nodes.input, input); assert.equal(mounted.root.querySelector('img'), mounted.photo);
+  assert.equal(mounted.body.scrollTop, 180);
+  assert.deepEqual([mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites], writes);
+});
+
+test('invalid and over-stock drafts restore the latest saved total with an explicit message', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p), input = mounted.nodes.input;
+  for (const value of ['', '-1', '1.2', '1e1', 'Infinity', '9007199254740992', '20']) {
+    editQuantity(context, input, value); input.blur();
+    assert.equal(cart()[0].quantity, 4, value); assert.equal(input.value, '4', value);
+    assert.match(element('toast').textContent, /Your saved quantity was not changed/);
+  }
+  assert.match(element('toast').textContent, /up to 19 pcs/);
+  editQuantity(context, input, '30');
+  setCart([item({ quantity: 7 })]); context.dispatchWindow('storage'); input.blur();
+  assert.equal(cart()[0].quantity, 7); assert.equal(input.value, '7');
+});
+
+test('storage sync preserves an active draft and selection, then commit uses latest commercial data', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, dispatchWindow, evaluate } = context;
+  const p = product({ price: 55, ml: '75', stock: 100 }); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p), input = mounted.nodes.input;
+  editQuantity(context, input, '12'); input.setSelectionRange(1, 1);
+  const newest = item({ quantity: 7, price: 41, ml: '50', img: 'saved-other.webp' });
+  const unrelated = item({ name: 'IL-B001', warehouse: 'IL', quantity: 3 });
+  setCart([newest, unrelated]); dispatchWindow('storage');
+  assert.equal(input.value, '12'); assert.equal(input.selectionStart, 1); assert.equal(input.selectionEnd, 1);
+  assert.equal(s.document.activeElement, input); assert.equal(mounted.nodes.input, input);
+  quantityKey(context, input, 'Enter');
+  assert.deepEqual(cart(), [{ ...newest, quantity: 12 }, unrelated]);
+  assert.equal(mounted.card.querySelector('img'), mounted.photo);
+});
+
+test('Escape cancels an input draft and dismisses its keyboard without closing the product or cart', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]);
+  s.openProduct(s.cartStockKey(p.id, p.warehouse));
+  const detail = mountStableDetail(context, p);
+  editQuantity(context, detail.nodes.input, '12');
+  assert.deepEqual(quantityKey(context, detail.nodes.input, 'Escape'), { prevented: true, stopped: true });
+  assert.equal(detail.nodes.input.value, '4'); assert.equal(cart()[0].quantity, 4);
+  assert.equal(element('product-dialog').open, true); assert.equal(element('confirm-dialog').open, false);
+  assert.notEqual(s.document.activeElement, detail.nodes.input);
+  s.openCart(); const drawer = mountStableCart(context);
+  editQuantity(context, drawer.lines[0].input, '10'); quantityKey(context, drawer.lines[0].input, 'Escape');
+  assert.equal(drawer.lines[0].input.value, '4'); assert.equal(cart()[0].quantity, 4);
+  assert.equal(element('cart-dialog').open, true);
+});
+
+test('typing zero requires approval and cancelling leaves the saved total and non-input focus intact', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, approve } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 14 })]);
+  s.openProduct(s.cartStockKey(p.id, p.warehouse)); const mounted = mountStableDetail(context, p);
+  editQuantity(context, mounted.nodes.input, '0'); quantityKey(context, mounted.nodes.input, 'Enter');
+  assert.equal(cart()[0].quantity, 14); assert.equal(element('confirm-dialog').open, true);
+  assert.equal(mounted.nodes.input.value, '14');
+  element('confirm-cancel').dispatchEvent({ type: 'click' });
+  assert.equal(cart()[0].quantity, 14); assert.equal(s.document.activeElement, mounted.nodes['product-minus']);
+  editQuantity(context, mounted.nodes.input, '0'); quantityKey(context, mounted.nodes.input, 'Enter'); approve();
+  assert.deepEqual(cart(), []); assert.equal(element('confirm-dialog').open, false);
+  assert.equal(mounted.root.querySelector('img'), mounted.photo); assert.ok(mounted.nodes.add);
+});
+
+test('queued close from a cancelled zero confirmation cannot clear the next confirmation or duplicate the dialog stack', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, evaluate, approve } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 14 })]);
+  s.openProduct(s.cartStockKey(p.id, p.warehouse)); const mounted = mountStableDetail(context, p);
+  const dialog = element('confirm-dialog');
+  const closeEvents = [];
+  dialog.close = () => { if (dialog.open) { dialog.open = false; closeEvents.push(() => dialog.dispatchEvent({ type: 'close' })); } };
+  editQuantity(context, mounted.nodes.input, '0'); quantityKey(context, mounted.nodes.input, 'Enter');
+  element('confirm-cancel').dispatchEvent({ type: 'click' });
+  editQuantity(context, mounted.nodes.input, '0'); quantityKey(context, mounted.nodes.input, 'Enter');
+  closeEvents.shift()();
+  assert.equal(dialog.open, true); assert.equal(evaluate('typeof state.confirm'), 'function');
+  assert.equal(evaluate('dialogStack.filter(dialog => dialog.id === "confirm-dialog").length'), 1);
+  approve(); assert.deepEqual(cart(), []);
+  closeEvents.shift()();
+  assert.equal(evaluate('dialogStack.filter(dialog => dialog.id === "confirm-dialog").length'), 0);
+  assert.equal(element('product-dialog').open, true);
+});
+
+test('zero approval checks the latest target item and never overwrites a new quantity from another window', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, approve } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]);
+  s.setProductQuantity(s.cartStockKey(p.id, p.warehouse), '0');
+  setCart([item({ quantity: 7 })]); approve();
+  assert.equal(cart()[0].quantity, 7); assert.match(element('toast').textContent, /changed in another window/);
+  s.setProductQuantity(s.cartStockKey(p.id, p.warehouse), '0');
+  const other = item({ name: 'IL-B001', warehouse: 'IL', quantity: 2 });
+  setCart([item({ quantity: 7 }), other]); approve();
+  assert.deepEqual(cart(), [other], 'unrelated additions are retained when the target is unchanged');
+});
+
+test('a draft cannot recreate an item removed in another window, and checking still blocks direct edits', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element, evaluate } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p), input = mounted.nodes.input;
+  editQuantity(context, input, '12'); setCart([]); context.dispatchWindow('storage');
+  assert.equal(mounted.nodes.input, input); assert.equal(input.value, '12');
+  quantityKey(context, input, 'Enter');
+  assert.deepEqual(cart(), []); assert.match(element('toast').textContent, /removed in another window/);
+  setCart([item({ quantity: 4 })]); evaluate('state.checking = true'); s.updateOrderUI();
+  assert.equal(mounted.nodes.input.disabled, true);
+  assert.equal(s.setProductQuantity(s.cartStockKey(p.id, p.warehouse), '7'), false);
+  assert.equal(cart()[0].quantity, 4); assert.match(element('toast').textContent, /being checked/);
+});
+
+test('warehouse count and pre-discount amounts update with cart inputs without remounting rows', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, element } = context;
+  const tx = product({ stock: 100 }), il = product({ id: 'IL-B001', warehouse: 'IL', price: 27, stock: 100 });
+  s.perfumeDB = [tx, il];
+  const txItem = item({ quantity: 3 }), ilItem = item({ name: il.id, warehouse: il.warehouse, price: il.price, quantity: 2 });
+  setCart([txItem, ilItem]); s.openCart();
+  assert.match(element('cart-body').innerHTML, /class="warehouse-section-name">TX Warehouse<\/span><span class="warehouse-section-summary">3 pcs · \$99\.00 before discount/);
+  const mounted = mountStableCart(context), row = mounted.lines[0];
+  const writes = mounted.root.innerHTMLWrites;
+  editQuantity(context, row.input, '20'); quantityKey(context, row.input, 'Enter');
+  assert.equal(cart()[0].quantity, 20); assert.equal(row.input.value, '20');
+  assert.equal(mounted.headings[0].summary.textContent, '20 pcs · $660.00 before discount');
+  assert.equal(mounted.headings[1].summary.textContent, '2 pcs · $54.00 before discount');
+  assert.equal(mounted.root.innerHTMLWrites, writes); assert.equal(row.line.querySelector('img'), row.photo);
+  const expected = model.getOrderSummary(cart(), site.tiers);
+  assert.ok(mounted.summary.innerHTML.includes('$' + expected.totalAmount.toFixed(2)));
+  assert.equal(element('mobile-order-total').textContent, '$' + expected.totalAmount.toFixed(2));
+  assert.equal(element('mobile-order-savings').textContent, `${s.formatDiscountPercent(expected.discountPercent)}% off · Saved $${expected.discountAmount.toFixed(2)}`);
+  assert.equal(element('mobile-order-savings').hidden, false);
+});
+
+test('warehouse summaries use cents and normalized warehouses while savings hide at zero discount', () => {
+  const items = [item({ warehouse: 'tx warehouse', price: 1.005, quantity: 2 }), item({ warehouse: ' TX ', price: 2.345, quantity: 1 }), item({ warehouse: 'IL', price: 26, quantity: 8 })];
+  assert.deepEqual(model.getWarehouseSummaries(items), [{ warehouse: 'TX', qty: 3, subtotal: 4.37 }, { warehouse: 'IL', qty: 8, subtotal: 208 }]);
+  const context = createContext();
+  const { sandbox: s, setCart, element } = context;
+  setCart([item()]); s.updateOrderUI();
+  assert.equal(element('mobile-order-savings').hidden, true);
+  assert.equal(element('mobile-order-savings').textContent, '');
+  assert.equal(s.warehouseSummaryText({ qty: 1, subtotal: 33 }), '1 pc · $33.00 before discount');
+  setCart([item({ quantity: 25 })]); s.updateOrderUI();
+  const expected = model.getOrderSummary(context.cart(), site.tiers);
+  assert.equal(element('mobile-order-savings').hidden, false);
+  assert.equal(element('mobile-order-savings').textContent, `${s.formatDiscountPercent(expected.discountPercent)}% off · Saved $${expected.discountAmount.toFixed(2)}`);
+  assert.match(element('mobile-order-quantity').textContent, /^25 items · /);
 });

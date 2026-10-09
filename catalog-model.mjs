@@ -180,3 +180,34 @@ export function getOrderSummary(items, tiers = []) {
     lvQty, otherQty: qty - lvQty,
   };
 }
+
+// Quantity drafts are totals, not amounts to append. Never coerce decimals,
+// exponent notation or an unsafe integer into a different order quantity.
+export function validateOrderQuantity(value, limit = Number.MAX_SAFE_INTEGER) {
+  const text = String(value ?? '').trim();
+  if (!/^\d+$/.test(text)) return { ok: false, reason: 'integer' };
+  const quantity = Number(text);
+  if (!Number.isSafeInteger(quantity) || quantity < 0) return { ok: false, reason: 'integer' };
+  const maximum = Number.isSafeInteger(limit) && limit >= 0 ? limit : 0;
+  if (quantity > maximum) return { ok: false, reason: 'stock', limit: maximum };
+  return { ok: true, quantity };
+}
+
+// Warehouses show their own count and pre-discount subtotal only. The discount
+// remains an order-wide calculation in getOrderSummary.
+export function getWarehouseSummaries(items) {
+  const groups = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const warehouse = String(item?.warehouse || '').trim().toUpperCase().replace(/\s+WAREHOUSE$/, '').trim();
+    const quantity = Number(item?.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    const qty = Math.floor(quantity);
+    const price = Number(item?.price);
+    const unitCents = Number.isFinite(price) && price > 0 ? Math.round((price + Number.EPSILON) * 100) : 0;
+    if (!groups.has(warehouse)) groups.set(warehouse, { warehouse, qty: 0, subtotalCents: 0 });
+    const group = groups.get(warehouse);
+    group.qty += qty;
+    group.subtotalCents += unitCents * qty;
+  }
+  return [...groups.values()].map(({ warehouse, qty, subtotalCents }) => ({ warehouse, qty, subtotal: subtotalCents / 100 }));
+}

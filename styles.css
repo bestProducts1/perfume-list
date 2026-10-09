@@ -122,3 +122,33 @@ body.catalog-list-view .quick-categories{display:none}
   .detail-copy{padding:12px 0 0}
   .detail-photo{height:min(260px,44dvh)}
 }
+
+/* Quantity entry stays within the existing stepper; photos remain untouched. */
+.quantity-stepper .quantity-input{flex:1 1 38px;width:38px;min-width:32px;height:100%;padding:0 3px;border:0;border-radius:0;background:transparent;text-align:center;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;line-height:normal;appearance:none}
+.quantity-stepper .quantity-input:focus{background:#fff;outline:2px solid #326387;outline-offset:-2px}
+.quantity-stepper .quantity-input:disabled{opacity:.55}
+.detail-quantity .quantity-input{min-width:42px;font-size:18px;font-weight:600}
+.cart-line{display:grid;grid-template-columns:55px minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start}
+.cart-line-image{grid-column:1;grid-row:1/3}
+.cart-line-info{grid-column:2}
+.cart-line-info h3{font-size:12px}
+.cart-line-controls{grid-column:2;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
+.cart-line-controls .quantity-stepper{flex:none;width:156px;max-width:calc(100% - 56px);height:46px;border-radius:8px}
+.cart-line-controls .quantity-stepper button{flex:none;width:44px;min-width:44px;height:44px;font-size:22px}
+.cart-line-controls .quantity-input{min-width:32px;font-size:16px}
+.remove-line{width:44px;height:44px;flex:none;border:1px solid var(--line);border-radius:8px;background:#f8f8f9}
+.remove-line:hover{background:#fff0f0;color:var(--red)}
+.remove-line .ti{font-size:20px}
+.warehouse-section-title{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;padding-bottom:6px;text-transform:none}
+.warehouse-section-name{font-size:11px;letter-spacing:.8px;text-transform:uppercase}
+.warehouse-section-summary{font-size:11px;font-weight:500;letter-spacing:0;color:#66666d}
+.mobile-order-bar>button>span:first-child{min-width:0;gap:1px}
+.mobile-order-bar>button>span:last-child{flex:none;white-space:nowrap}
+#mobile-order-savings{font-size:10px;color:#c8e9d2;font-weight:500;line-height:1.4}
+body.has-order{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+body.has-order>.toast{bottom:calc(112px + env(safe-area-inset-bottom))}
+@media(min-width:651px){
+  #mobile-order-savings{font-size:11px}
+  body.has-order{padding-bottom:calc(130px + env(safe-area-inset-bottom))}
+  body.has-order>.toast{bottom:calc(130px + env(safe-area-inset-bottom))}
+}
