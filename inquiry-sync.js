@@ -42,18 +42,27 @@
       if (!payload || payload.version !== 1 || payload.source !== 'SKU' ||
           typeof payload.revision !== 'string' || !revisionPattern.test(payload.revision) ||
           !Number.isSafeInteger(payload.createdAt) || payload.createdAt <= 0) return null;
+      if (payload.action !== undefined && !['replace', 'clear'].includes(payload.action)) return null;
+      if (payload.action === 'clear') {
+        if (!Array.isArray(payload.items) || payload.items.length !== 0) return null;
+        return {version: 1, source: 'SKU', revision: payload.revision, createdAt: payload.createdAt, action: 'clear', items: []};
+      }
       const items = normalizeItems(payload.items);
       return items ? {version: 1, source: 'SKU', revision: payload.revision, createdAt: payload.createdAt, items} : null;
     } catch { return null; }
   }
 
-  function publish(cart) {
-    const items = normalizeItems(cart, true);
+  function publish(cart, options = {}) {
+    // Only an intentional SKU cart mutation may send a clear event. An empty or
+    // malformed legacy inquiry must never erase a receiving storefront's order.
+    const clear = options?.allowClear === true && Array.isArray(cart) && cart.length === 0;
+    const items = clear ? [] : normalizeItems(cart, true);
     if (!items) throw new Error('The inquiry contains invalid product codes or quantities.');
     const createdAt = Date.now();
     const revision = window.crypto?.randomUUID?.() ||
       createdAt.toString(36) + '-' + Math.random().toString(36).slice(2);
     const payload = {version: 1, source: 'SKU', revision, createdAt, items};
+    if (clear) payload.action = 'clear';
     localStorage.setItem(storageKey, JSON.stringify(payload));
     return payload;
   }

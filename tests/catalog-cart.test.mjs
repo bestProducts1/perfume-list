@@ -1613,9 +1613,9 @@ function seedInquiry(context, payload = inquiry()) {
 
 test('SKU handoff helper loads before product data and its receiver cache version changes', () => {
   const html = source('index.html');
-  assert.match(html, /inquiry-sync\.js\?v=20261009-sku-inquiry/);
+  assert.match(html, /inquiry-sync\.js\?v=20261009-manual-sku-sync/);
   assert.ok(html.indexOf('inquiry-sync.js') < html.indexOf('db.js'));
-  assert.match(html, /app\.mjs\?v=20261009-sku-inquiry/);
+  assert.match(html, /app\.mjs\?v=20261009-manual-sku-sync/);
   assert.match(html, /db\.js\?v=20261009-cart-isolation/);
 });
 
@@ -1839,4 +1839,128 @@ test('each new inquiry replaces rather than appends and leaves unrelated storage
   const refreshed = createContext({ sharedStorage: context.memory }); refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
   assert.equal(refreshed.cart()[0].quantity, 5);
   for (const [key, value] of untouched) assert.equal(context.memory.get(key), value, key);
+});
+const clearInquiry = (revision = 'inquiry-clear-1') => ({ ...inquiry([], revision), action: 'clear' });
+
+test('an explicit SKU clear empties only this scoped order with an independent receipt and non-modal feedback', () => {
+  const untouched = [[storageKeys.otherCart, JSON.stringify([item({ quantity: 99, price: 36 })])],
+    [storageKeys.sharedCart, JSON.stringify([item({ quantity: 55 })])], [storageKeys.sharedReset, 'done'],
+    ['bestProducts1SkuCartV2', JSON.stringify([item({ quantity: 18 })])]];
+  const context = createContext({ initialStorage: untouched }); context.setCart([item({ quantity: 7 })]);
+  seedInquiry(context, clearInquiry());
+  context.sandbox.perfumeDB = [product()]; context.sandbox.renderHome();
+  assert.deepEqual(context.cart(), []);
+  assert.equal(context.memory.get(storageKeys.cart), '[]');
+  assert.equal(context.memory.get(storageKeys.receipt), 'inquiry-clear-1');
+  assert.equal(context.element('cart-count').textContent, 0);
+  assert.match(context.element('cart-validation').textContent, /Order cleared to match SKU/);
+  assert.equal(context.element('cart-validation').dataset.state, 'ready');
+  assert.match(context.element('toast').textContent, /Order cleared to match SKU/);
+  for (const [key, value] of untouched) assert.equal(context.memory.get(key), value, key);
+});
+
+test('a handled clear revision never removes later storefront additions or edits on another refresh', () => {
+  const context = createContext(); context.setCart([item({ quantity: 7 })]);
+  seedInquiry(context, clearInquiry());
+  context.sandbox.perfumeDB = [product({ stock: 100 })]; context.sandbox.renderHome();
+  assert.deepEqual(context.cart(), []);
+  context.sandbox.addToOrder('TX-A055::TX');
+  context.sandbox.setProductQuantity('TX-A055::TX', '5');
+  const raw = context.memory.get(storageKeys.cart);
+  const refreshed = createContext({ sharedStorage: context.memory });
+  refreshed.sandbox.perfumeDB = [product({ price: 36, stock: 100 })]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.memory.get(storageKeys.cart), raw);
+  assert.equal(refreshed.cart()[0].quantity, 5);
+  assert.equal(refreshed.element('toast').textContent, '');
+  assert.equal(refreshed.memory.get(storageKeys.receipt), 'inquiry-clear-1');
+});
+
+test('each directory acknowledges an explicit clear independently without clearing already-edited sibling orders', () => {
+  const sharedStorage = new Map();
+  const otherId = isCatalog ? 'perfume-list' : 'catalog';
+  const own = createContext({ sharedStorage });
+  const other = createContext({ sharedStorage, storefrontId: otherId });
+  own.setCart([item({ quantity: 7 })]); other.setCart([item({ quantity: 9, price: 36 })]);
+  seedInquiry(own, clearInquiry());
+  own.sandbox.perfumeDB = [product({ stock: 100 })]; own.sandbox.renderHome();
+  assert.deepEqual(own.cart(), []); assert.equal(other.cart()[0].quantity, 9);
+  assert.equal(sharedStorage.has(other.sandbox.SkuInquirySync.receiptKey(otherId)), false);
+  own.sandbox.addToOrder('TX-A055::TX'); own.sandbox.setProductQuantity('TX-A055::TX', '4');
+  other.sandbox.perfumeDB = [product({ stock: 100, price: 36 })]; other.sandbox.renderHome();
+  assert.deepEqual(other.cart(), []); assert.equal(own.cart()[0].quantity, 4);
+  assert.equal(sharedStorage.get(own.sandbox.SkuInquirySync.receiptKey(site.id)), 'inquiry-clear-1');
+  assert.equal(sharedStorage.get(other.sandbox.SkuInquirySync.receiptKey(otherId)), 'inquiry-clear-1');
+  other.sandbox.addToOrder('TX-A055::TX');
+  const refreshedOther = createContext({ sharedStorage, storefrontId: otherId });
+  refreshedOther.sandbox.perfumeDB = [product({ stock: 100, price: 36 })]; refreshedOther.sandbox.renderHome();
+  assert.equal(refreshedOther.cart()[0].quantity, 1); assert.equal(own.cart()[0].quantity, 4);
+});
+
+test('a later SKU clear waits for the next page refresh and cannot clear during checkout or UI renders', () => {
+  const context = createContext(); context.sandbox.perfumeDB = [product({ stock: 100 })]; context.sandbox.renderHome();
+  context.sandbox.addToOrder('TX-A055::TX'); context.sandbox.setProductQuantity('TX-A055::TX', '4');
+  seedInquiry(context, clearInquiry());
+  context.dispatchWindow('storage', { key: storageKeys.inquiry, storageArea: context.sandbox.localStorage });
+  context.dispatchWindow('pageshow'); context.sandbox.renderHome();
+  context.evaluate('state.checking = true'); context.sandbox.renderHome();
+  context.evaluate('state.checking = false'); context.sandbox.renderHome(); context.sandbox.updateOrderUI();
+  assert.equal(context.cart()[0].quantity, 4); assert.equal(context.memory.has(storageKeys.receipt), false);
+  const refreshed = createContext({ sharedStorage: context.memory });
+  refreshed.sandbox.perfumeDB = [product({ stock: 100 })]; refreshed.sandbox.renderHome();
+  assert.deepEqual(refreshed.cart(), []); assert.equal(refreshed.memory.get(storageKeys.receipt), 'inquiry-clear-1');
+});
+
+test('an explicit clear is deferred until products load and is not inferred from a malformed empty inquiry', () => {
+  const context = createContext(); context.setCart([item({ quantity: 7 })]); seedInquiry(context, clearInquiry());
+  context.sandbox.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(context.memory.has(storageKeys.receipt), false);
+  context.sandbox.perfumeDB = [product()]; context.sandbox.renderHome();
+  assert.deepEqual(context.cart(), []); assert.equal(context.memory.get(storageKeys.receipt), 'inquiry-clear-1');
+  for (const payload of [inquiry([]), { ...inquiry([]), action: 'replace' }, { ...inquiry(), action: 'clear' }]) {
+    const broken = createContext(); broken.setCart([item({ quantity: 7 })]); seedInquiry(broken, payload);
+    broken.sandbox.perfumeDB = [product()]; broken.sandbox.renderHome();
+    assert.equal(broken.cart()[0].quantity, 7); assert.equal(broken.memory.has(storageKeys.receipt), false);
+    assert.equal(broken.element('toast').textContent, '');
+  }
+});
+
+test('a failed clear write retains the scoped cart, does not acknowledge and never claims success', () => {
+  const context = createContext(); context.setCart([item({ quantity: 7 })]); seedInquiry(context, clearInquiry());
+  const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+  s.localStorage.setItem = (key, value) => { if (key === storageKeys.cart) throw new Error('quota'); return set(key, value); };
+  s.perfumeDB = [product()]; s.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be saved.*previous order was kept/);
+  assert.doesNotMatch(context.element('toast').textContent, /Order cleared/);
+});
+
+test('a failed clear receipt restores the exact prior cart and receipt and the clear remains retryable', () => {
+  for (const previous of [null, JSON.stringify([item({ price: 22, quantity: 7 })])]) {
+    const context = createContext(); seedInquiry(context, clearInquiry());
+    if (previous !== null) context.memory.set(storageKeys.cart, previous);
+    context.memory.set(storageKeys.receipt, 'earlier-import');
+    const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+    s.localStorage.setItem = (key, value) => { if (key === storageKeys.receipt) throw new Error('quota'); return set(key, value); };
+    s.perfumeDB = [product()]; s.renderHome();
+    assert.equal(memory.get(storageKeys.cart) ?? null, previous); assert.equal(memory.get(storageKeys.receipt), 'earlier-import');
+    assert.match(context.element('toast').textContent, /previous order was kept/);
+    assert.doesNotMatch(context.element('toast').textContent, /Order cleared/);
+    const refreshed = createContext({ sharedStorage: memory });
+    refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
+    assert.deepEqual(refreshed.cart(), []); assert.equal(memory.get(storageKeys.receipt), 'inquiry-clear-1');
+  }
+});
+
+test('a failed clear receipt rollback preserves a concurrent newer edit instead of restoring the stale prior cart', () => {
+  const context = createContext(); seedInquiry(context, clearInquiry()); context.setCart([item({ quantity: 7 })]);
+  const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+  const newer = JSON.stringify([item({ quantity: 12, price: 36 })]);
+  s.localStorage.setItem = (key, value) => {
+    if (key === storageKeys.receipt) { memory.set(storageKeys.cart, newer); throw new Error('quota'); }
+    return set(key, value);
+  };
+  s.perfumeDB = [product()]; s.renderHome();
+  assert.equal(memory.get(storageKeys.cart), newer); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be saved completely.*Review your order/);
+  assert.doesNotMatch(context.element('toast').textContent, /Order cleared/);
 });

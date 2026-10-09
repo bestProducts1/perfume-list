@@ -66,7 +66,7 @@ function quantityForReference(reference,cart=readCart()){return cart.filter(item
 function remainingStock(product){return Math.max(0,window.getOrderStockLimit(product)-quantityInCart(product));}
 
 function importPendingSkuInquiry(){
-  // SKU hands off quantities once per page load. Subsequent renders and storage
+  // SKU hands off quantities or an explicit clear once per page load. Renders and storage
   // notifications must never restore items that the user edited or cleared.
   if(skuInquiryEntryHandled)return;
   skuInquiryEntryHandled=true;
@@ -83,6 +83,7 @@ function importPendingSkuInquiry(){
     showToast('The SKU list could not be read. Your order was not changed.');
     return;
   }
+  const clearRequested=payload.action==='clear';
   const ownProducts=new Map(products().map(product=>[stockKey(product),product]));
   const imported=[],notices=[];
   for(const requested of payload.items){
@@ -101,9 +102,10 @@ function importPendingSkuInquiry(){
   const serialized=JSON.stringify(imported);
   let cartWritten=false;
   try{
-    // A wholly unmatched handoff must not destroy an existing order. Remember
+    // An explicit SKU clear can empty this scoped order. A wholly unmatched
+    // handoff must not destroy an existing order. Remember
     // its revision so the same warning does not repeat on each refresh.
-    if(imported.length){localStorage.setItem(CART_STORAGE_KEY,serialized);cartWritten=true;}
+    if(clearRequested||imported.length){localStorage.setItem(CART_STORAGE_KEY,serialized);cartWritten=true;}
     localStorage.setItem(receiptKey,payload.revision);
   }catch{
     // localStorage has no transaction. Restore the original raw cart if writing
@@ -128,7 +130,7 @@ function importPendingSkuInquiry(){
     setValidation(message,'error');showToast(message);return;
   }
   const quantity=imported.reduce((sum,item)=>sum+item.quantity,0);
-  const message=imported.length?`Imported ${quantity} ${quantity===1?'pc':'pcs'} from SKU into this site’s order.`:'No SKU products could be added. Your existing order was kept.';
+  const message=clearRequested?'Order cleared to match SKU.':imported.length?`Imported ${quantity} ${quantity===1?'pc':'pcs'} from SKU into this site’s order.`:'No SKU products could be added. Your existing order was kept.';
   setValidation([message,...notices].join('\n'),notices.length?'error':'ready');
   showToast(notices.length&&imported.length?`${message} Review the skipped items or quantity adjustments in your order.`:message);
 }

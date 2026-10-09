@@ -51,3 +51,32 @@ test('receipts are storefront-specific and unavailable storage fails safely',()=
   sandbox.localStorage.getItem=()=>{throw Error('blocked');};assert.equal(api.read(),null);
   sandbox.localStorage.setItem=()=>{throw Error('quota');};assert.throws(()=>api.publish([line()]),/quota/);
 });
+
+test('only an explicit SKU clear may publish an empty list and never writes storefront carts',()=>{
+  const {api,memory}=context();
+  memory.set('bestProducts1:catalog:cart:v1','keep catalog');
+  memory.set('bestProducts1:perfume-list:cart:v1','keep perfume');
+  const payload=plain(api.publish([],{allowClear:true}));
+  assert.equal(payload.action,'clear');assert.deepEqual(payload.items,[]);
+  assert.deepEqual(plain(api.read()),payload);
+  const saved=memory.get(api.storageKey);
+  assert.throws(()=>api.publish([]));assert.equal(memory.get(api.storageKey),saved);
+  assert.equal(memory.get('bestProducts1:catalog:cart:v1'),'keep catalog');
+  assert.equal(memory.get('bestProducts1:perfume-list:cart:v1'),'keep perfume');
+  const next=plain(api.publish([line()],{allowClear:true}));
+  assert.equal(next.action,undefined);
+  assert.deepEqual(next.items,[{sku:'IL-B008',warehouse:'IL',quantity:3}]);
+});
+
+test('ambiguous empty messages and inconsistent or unknown actions cannot clear an order',()=>{
+  const {api,memory}=context();const payload=plain(api.publish([line()]));
+  for(const invalid of [
+    {...payload,items:[]},
+    {...payload,action:'replace',items:[]},
+    {...payload,action:'clear'},
+    {...payload,action:'delete',items:[]},
+    {...payload,action:null,items:[]},
+    {...payload,action:'clear',items:null},
+    {...payload,action:'clear',items:[{sku:'IL-B008',warehouse:'IL',quantity:0}]},
+  ]){memory.set(api.storageKey,JSON.stringify(invalid));assert.equal(api.read(),null);}
+});
