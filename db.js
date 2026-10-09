@@ -12,8 +12,8 @@ const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V13";
 const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V13";
 const CATALOG_DISCOUNT_TIERS = window.STOREFRONT_CONFIG.discountTiers;
 const SHIPPING_LABEL = window.STOREFRONT_CONFIG.shippingLabel;
-const CART_STORAGE_KEY = "bestProducts1SharedCartV3";
-const CART_RESET_KEY = "bestProducts1SharedCartResetV3";
+// GitHub Pages sites share an origin, so each storefront needs its own cart.
+const CART_STORAGE_KEY = `bestProducts1:${window.STOREFRONT_CONFIG.siteId}:cart:v1`;
 const MIN_ORDER_STOCK = 19;
 let latestProductRequest = null;
 
@@ -137,30 +137,17 @@ function parseStoredCart(rawCart) {
   }
 }
 
-function resetCatalogCartOnce() {
-  if (localStorage.getItem(CART_RESET_KEY) === "done") return;
-  localStorage.removeItem("perfumeCart");
-  localStorage.removeItem("bestProducts1CatalogCartV1");
-  localStorage.removeItem("bestProducts1CatalogCartV2");
-  localStorage.removeItem("bestProducts1SkuCartV1");
-  localStorage.removeItem("bestProducts1SkuCartV2");
-  localStorage.removeItem(CART_STORAGE_KEY);
-  localStorage.setItem(CART_RESET_KEY, "done");
-}
-
 function readStoredCart() {
-  resetCatalogCartOnce();
+  // Do not import ambiguous shared carts or delete data belonging to other tools.
   return parseStoredCart(localStorage.getItem(CART_STORAGE_KEY));
 }
 
 function writeStoredCart(items) {
-  resetCatalogCartOnce();
   const cart = Array.isArray(items) ? items : [];
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
 }
 
 function clearStoredCart() {
-  resetCatalogCartOnce();
   localStorage.removeItem(CART_STORAGE_KEY);
 }
 

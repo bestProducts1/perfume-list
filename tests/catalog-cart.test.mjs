@@ -37,14 +37,21 @@ const item = (overrides = {}) => ({
   brand: 'Bond No. 9', price: 33, quantity: 1, ml: '100', img: 'photo.webp', ...overrides,
 });
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
-const storageKeys = { cart: 'bestProducts1SharedCartV3', reset: 'bestProducts1SharedCartResetV3' };
+const storageKeys = {
+  cart: `bestProducts1:${site.id}:cart:v1`,
+  otherCart: `bestProducts1:${isCatalog ? 'perfume-list' : 'catalog'}:cart:v1`,
+  sharedCart: 'bestProducts1SharedCartV3',
+  sharedReset: 'bestProducts1SharedCartResetV3',
+};
 
 // Load the production configuration, production data module and real page handlers.
 // This intentionally no longer extracts the obsolete inline scripts from index/cart.html.
 // Only DOM rendering and browser APIs are stubbed; inventory, quantity, reconciliation,
 // totals, message composition and checkout all execute the shipping implementation.
-function createContext({ initialStorage = [], location = 'index.html' } = {}) {
-  const memory = new Map(initialStorage);
+function createContext({ initialStorage = [], sharedStorage, storefrontId = site.id, location = 'index.html' } = {}) {
+  const memory = sharedStorage || new Map(initialStorage);
+  const storageAccess = [];
+  const cartKey = `bestProducts1:${storefrontId}:cart:v1`;
   const elements = new Map();
   const documentListeners = new Map();
   const windowListeners = new Map();
@@ -150,9 +157,9 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
     location: { href: location, search: location.includes('?') ? '?' + location.split('?')[1].split('#')[0] : '', hash: location.includes('#') ? '#' + location.split('#')[1] : '', host: 'example.test' },
     document,
     localStorage: {
-      getItem: (key) => memory.get(key) ?? null,
-      setItem: (key, value) => memory.set(key, String(value)),
-      removeItem: (key) => memory.delete(key),
+      getItem: (key) => { storageAccess.push(['get', key]); return memory.get(key) ?? null; },
+      setItem: (key, value) => { storageAccess.push(['set', key]); memory.set(key, String(value)); },
+      removeItem: (key) => { storageAccess.push(['remove', key]); memory.delete(key); },
     },
     fetch: async () => { throw new Error('offline'); },
     alert: () => { throw new Error('Unexpected native alert'); },
@@ -161,17 +168,19 @@ function createContext({ initialStorage = [], location = 'index.html' } = {}) {
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(source('storefront-config.js'), sandbox, { filename: 'storefront-config.js' });
+  if (storefrontId !== site.id) {
+    sandbox.STOREFRONT_CONFIG = Object.freeze({ ...sandbox.STOREFRONT_CONFIG, siteId: storefrontId });
+  }
   vm.runInContext(source('db.js'), sandbox, { filename: 'db.js' });
   const app = source('app.mjs').replace(/^import[^\n]*\n/gm, '');
   vm.runInContext(app, sandbox, { filename: 'app.mjs' });
   return {
-    sandbox, memory, element,
+    sandbox, memory, element, storageAccess, cartKey,
     evaluate: (code) => vm.runInContext(code, sandbox),
     dispatchDocument: (type, event) => document.dispatchEvent({ type, ...event }),
     dispatchWindow: (type, event = {}) => sandbox.dispatchEvent({ type, ...event }),
     setCart(cart) {
-      memory.set(storageKeys.reset, 'done');
-      memory.set(storageKeys.cart, JSON.stringify(cart));
+      memory.set(cartKey, JSON.stringify(cart));
     },
     cart: () => plain(sandbox.readStoredCart()),
     approve: () => element('confirm-submit').dispatchEvent({ type: 'click' }),
@@ -403,23 +412,29 @@ test('warehouse labels normalize and malformed storage cannot crash a cart', () 
   const { sandbox: s, memory } = createContext();
   assert.equal(s.reconcileCart([item({ warehouse: 'tx Warehouse' })], [product()]).items.length, 1);
   for (const raw of ['broken', '{}', 'null']) {
-    memory.set(storageKeys.reset, 'done');
     memory.set(storageKeys.cart, raw);
     assert.deepEqual(plain(s.readStoredCart()), []);
   }
 });
 
-test('catalog storage clears old carts once and then uses the shared official-SKU cart', () => {
-  const { sandbox: s, memory } = createContext();
-  memory.delete(storageKeys.reset);
-  for (const key of ['perfumeCart', 'bestProducts1CatalogCartV1', 'bestProducts1CatalogCartV2', 'bestProducts1SkuCartV2']) {
-    memory.set(key, JSON.stringify([item({ name: 'B02', warehouse: '' })]));
-  }
-  assert.deepEqual(plain(s.readStoredCart()), []);
-  for (const key of ['perfumeCart', 'bestProducts1CatalogCartV1', 'bestProducts1CatalogCartV2', 'bestProducts1SkuCartV2']) assert.equal(memory.has(key), false);
+test('storefront uses only its site cart and never reads, migrates or deletes older shared carts', () => {
+  const legacyKeys = ['perfumeCart', 'bestProducts1CatalogCartV1', 'bestProducts1CatalogCartV2',
+    'bestProducts1SkuCartV1', 'bestProducts1SkuCartV2', storageKeys.sharedCart, storageKeys.sharedReset, storageKeys.otherCart];
+  const legacy = new Map(legacyKeys.map((key) => [key, JSON.stringify([item({ name: 'B02', warehouse: '' })])]));
+  const { sandbox: s, memory, cart, storageAccess, evaluate } = createContext({ initialStorage: legacy });
+  assert.equal(evaluate('CART_STORAGE_KEY'), storageKeys.cart);
+  assert.deepEqual(cart(), [], 'a fresh site cart must not inherit any old shared or other-site items');
   s.writeStoredCart([item()]);
-  assert.deepEqual(plain(s.readStoredCart().map((entry) => entry.name)), ['TX-A055']);
+  assert.deepEqual(cart().map((entry) => entry.name), ['TX-A055']);
   assert.equal(JSON.parse(memory.get(storageKeys.cart))[0].name, 'TX-A055');
+  s.clearStoredCart();
+  assert.deepEqual(cart(), []);
+  assert.equal(memory.has(storageKeys.cart), false);
+  for (const [key, value] of legacy) assert.equal(memory.get(key), value, `${key} must remain unchanged`);
+  assert.ok(storageAccess.every(([, key]) => !legacyKeys.includes(key)), 'legacy and other-site keys must not even be read');
+  assert.equal(evaluate('typeof resetCatalogCartOnce'), 'undefined');
+  assert.equal(evaluate('typeof CART_RESET_KEY'), 'undefined');
+  assert.doesNotMatch(source('db.js'), /SharedCart|CatalogCartV[12]|SkuCartV[12]|resetCatalogCartOnce|CART_RESET_KEY/);
 });
 
 test('search supports accents, volume, aliases and both warehouses with official identifiers', () => {
@@ -668,11 +683,14 @@ test('site configuration preserves its own sheet, WhatsApp, shipping and entire 
   assert.ok(source('index.html').includes('storefront-config.js'));
 });
 
-test('publishing does not clear the existing shared cart or touch the isolated preview cart', () => {
+test('publishing retains this site cart and ignores shared, other-site and preview carts', () => {
   const saved = [item({ quantity: 7, price: 28 })];
   const preview = JSON.stringify([item({ name: 'IL-B999', warehouse: 'IL', quantity: 2 })]);
+  const shared = JSON.stringify([item({ quantity: 15, price: 1 })]);
+  const other = JSON.stringify([item({ quantity: 3, price: 90 })]);
   const { sandbox: s, memory, cart, dispatchWindow, element } = createContext({
-    initialStorage: [[storageKeys.reset, 'done'], [storageKeys.cart, JSON.stringify(saved)],
+    initialStorage: [[storageKeys.cart, JSON.stringify(saved)], [storageKeys.sharedReset, 'done'],
+      [storageKeys.sharedCart, shared], [storageKeys.otherCart, other],
       ['bestProducts1CatalogPreviewCartReadyV1', 'done'], ['bestProducts1CatalogPreviewCartV1', preview]],
   });
   assert.deepEqual(cart(), saved);
@@ -683,10 +701,173 @@ test('publishing does not clear the existing shared cart or touch the isolated p
   assert.equal(element('cart-count').textContent, 9);
   dispatchWindow('pageshow');
   assert.equal(cart()[0].quantity, 9);
-  assert.equal(memory.get(storageKeys.reset), 'done');
+  assert.equal(memory.get(storageKeys.sharedReset), 'done');
   assert.doesNotMatch(source('app.mjs'), /CatalogPreviewCart|CatalogPreviewCartReady/);
   s.writeStoredCart([item({ quantity: 4 })]);
   assert.equal(memory.get('bestProducts1CatalogPreviewCartV1'), preview);
+  assert.equal(memory.get(storageKeys.sharedCart), shared);
+  assert.equal(memory.get(storageKeys.otherCart), other);
+});
+
+test('both storefronts sharing the same origin keep independent quantities and prices after reload', () => {
+  const sharedStorage = new Map([[storageKeys.sharedCart, JSON.stringify([item({ quantity: 99, price: 1 })])],
+    [storageKeys.sharedReset, 'done']]);
+  const own = createContext({ sharedStorage });
+  const otherId = isCatalog ? 'perfume-list' : 'catalog';
+  const other = createContext({ sharedStorage, storefrontId: otherId });
+  assert.equal(own.cartKey, storageKeys.cart);
+  assert.equal(other.cartKey, storageKeys.otherCart);
+  assert.notEqual(own.cartKey, other.cartKey);
+  assert.deepEqual(own.cart(), []); assert.deepEqual(other.cart(), []);
+  const ownProduct = product({ price: 26, stock: 100 });
+  const otherProduct = product({ price: 36, stock: 100 });
+  own.sandbox.perfumeDB = [ownProduct]; other.sandbox.perfumeDB = [otherProduct];
+  const key = own.sandbox.cartStockKey(ownProduct.id, ownProduct.warehouse);
+  own.sandbox.addToOrder(key);
+  assert.equal(own.cart()[0].price, 26); assert.equal(own.cart()[0].quantity, 1);
+  assert.deepEqual(other.cart(), []);
+  other.sandbox.addToOrder(key); other.sandbox.updateProductQuantity(key, 1);
+  assert.equal(other.cart()[0].price, 36); assert.equal(other.cart()[0].quantity, 2);
+  assert.equal(own.cart()[0].price, 26); assert.equal(own.cart()[0].quantity, 1);
+  own.sandbox.setProductQuantity(key, '8');
+  assert.equal(own.cart()[0].quantity, 8); assert.equal(other.cart()[0].quantity, 2);
+  const ownReload = createContext({ sharedStorage });
+  const otherReload = createContext({ sharedStorage, storefrontId: otherId });
+  assert.deepEqual(ownReload.cart(), own.cart()); assert.deepEqual(otherReload.cart(), other.cart());
+  assert.equal(ownReload.element('cart-count').textContent, 8);
+  assert.equal(otherReload.element('cart-count').textContent, 2);
+  assert.equal(JSON.parse(sharedStorage.get(storageKeys.sharedCart))[0].quantity, 99);
+  assert.equal(sharedStorage.get(storageKeys.sharedReset), 'done');
+});
+
+test('all old shared reset flag states are ignored without clearing a valid site cart or touching other data', () => {
+  const saved = [item({ quantity: 3, price: 26 })];
+  for (const reset of [undefined, '', 'done', 'broken']) {
+    const untouched = [[storageKeys.sharedCart, JSON.stringify([item({ quantity: 50 })])],
+      [storageKeys.otherCart, JSON.stringify([item({ quantity: 8, price: 36 })])],
+      ['bestProducts1SkuCartV2', 'legacy supplier cart'], [site.cache, 'cached site products']];
+    if (reset !== undefined) untouched.push([storageKeys.sharedReset, reset]);
+    const context = createContext({ initialStorage: [[storageKeys.cart, JSON.stringify(saved)], ...untouched] });
+    assert.deepEqual(context.cart(), saved, `reset flag ${String(reset)}`);
+    context.sandbox.writeStoredCart([item({ quantity: 4 })]);
+    context.sandbox.clearStoredCart();
+    for (const [key, value] of untouched) assert.equal(context.memory.get(key), value, key);
+    if (reset === undefined) assert.equal(context.memory.has(storageKeys.sharedReset), false);
+    assert.ok(context.storageAccess.every(([, key]) => ![storageKeys.sharedCart, storageKeys.otherCart,
+      storageKeys.sharedReset, 'bestProducts1SkuCartV2'].includes(key)));
+  }
+});
+
+test('same-site storage events and pageshow refresh the order while named unrelated events do nothing', () => {
+  const context = createContext({ initialStorage: [[storageKeys.cart, JSON.stringify([item({ quantity: 2 })])]] });
+  const { sandbox: s, memory, dispatchWindow, element, storageAccess } = context;
+  let updates = 0;
+  const update = s.updateOrderUI;
+  s.updateOrderUI = () => { updates++; return update(); };
+  const unrelatedKeys = [storageKeys.otherCart, storageKeys.sharedCart, storageKeys.sharedReset,
+    site.cache, `bestProducts1${site.id}LayoutV1`, 'random-other-app'];
+  for (const key of unrelatedKeys) {
+    memory.set(key, JSON.stringify([item({ quantity: 90, price: 1 })]));
+    storageAccess.length = 0;
+    dispatchWindow('storage', { key, storageArea: s.localStorage });
+    assert.equal(updates, 0, key); assert.equal(element('cart-count').textContent, 2, key);
+    assert.deepEqual(storageAccess, [], 'unrelated changes should not even re-read the site cart');
+  }
+  memory.set(storageKeys.cart, JSON.stringify([item({ quantity: 7, price: 26 })]));
+  dispatchWindow('storage', { key: storageKeys.cart, storageArea: s.localStorage });
+  assert.equal(updates, 1); assert.equal(element('cart-count').textContent, 7);
+  const expected = model.getOrderSummary(context.cart(), site.tiers);
+  assert.equal(element('mobile-order-total').textContent, '$' + expected.totalAmount.toFixed(2));
+  memory.set(storageKeys.cart, JSON.stringify([item({ quantity: 9, price: 26 })]));
+  dispatchWindow('pageshow'); assert.equal(updates, 2); assert.equal(element('cart-count').textContent, 9);
+});
+
+test('clearing localStorage in another tab synchronizes the empty own order via a null storage key', () => {
+  const context = createContext({ initialStorage: [[storageKeys.cart, JSON.stringify([item({ quantity: 2 })])]] });
+  const { sandbox: s, memory, dispatchWindow, element, storageAccess } = context;
+  assert.equal(element('mobile-order-bar').hidden, false);
+  memory.clear(); // Simulate the browser's clear() in another same-origin tab, not an application action.
+  storageAccess.length = 0;
+  dispatchWindow('storage', { key: null, storageArea: s.localStorage });
+  assert.deepEqual(context.cart(), []); assert.equal(element('cart-count').textContent, 0);
+  assert.equal(element('mobile-order-bar').hidden, true);
+  assert.ok(storageAccess.every(([operation]) => operation === 'get'), 'a clear notification must not write or reset other app data');
+});
+
+test('a storage event from a different storage area cannot refresh the localStorage order', () => {
+  const context = createContext({ initialStorage: [[storageKeys.cart, JSON.stringify([item({ quantity: 2 })])]] });
+  const { sandbox: s, memory, dispatchWindow, element, storageAccess } = context;
+  memory.set(storageKeys.cart, JSON.stringify([item({ quantity: 7 })])); storageAccess.length = 0;
+  dispatchWindow('storage', { key: storageKeys.cart, storageArea: { getItem() { return null; } } });
+  assert.equal(element('cart-count').textContent, 2); assert.deepEqual(storageAccess, []);
+  dispatchWindow('storage', { key: storageKeys.cart, storageArea: s.localStorage });
+  assert.equal(element('cart-count').textContent, 7);
+});
+
+test('an unrelated storefront storage event cannot disrupt an active quantity draft or its selection', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, memory, dispatchWindow, evaluate, storageAccess } = context;
+  const p = product({ stock: 100 }); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]); evaluate('state.loaded = true');
+  const mounted = mountStableCard(context, p), input = mounted.nodes.input;
+  editQuantity(context, input, '12'); input.setSelectionRange(1, 1);
+  const writes = [mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites];
+  for (const key of [storageKeys.otherCart, storageKeys.sharedCart, storageKeys.sharedReset]) {
+    memory.set(key, JSON.stringify([item({ quantity: 80 })])); storageAccess.length = 0;
+    dispatchWindow('storage', { key, storageArea: s.localStorage });
+    assert.deepEqual(storageAccess, []);
+    assert.equal(input.value, '12'); assert.equal(input.selectionStart, 1); assert.equal(input.selectionEnd, 1);
+    assert.equal(s.document.activeElement, input); assert.equal(mounted.nodes.input, input);
+    assert.deepEqual([mounted.root.innerHTMLWrites, mounted.actions.innerHTMLWrites], writes);
+  }
+  quantityKey(context, input, 'Enter');
+  assert.equal(context.cart()[0].quantity, 12);
+  assert.equal(JSON.parse(memory.get(storageKeys.otherCart))[0].quantity, 80);
+});
+
+test('another storefront changing its cart cannot invalidate this site removal confirmation', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, memory, dispatchWindow, element, evaluate, approve, storageAccess } = context;
+  const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]);
+  s.setProductQuantity(s.cartStockKey(p.id, p.warehouse), '0');
+  const confirm = evaluate('state.confirm');
+  const unrelated = JSON.stringify([item({ quantity: 99, price: 36 })]);
+  memory.set(storageKeys.otherCart, unrelated); storageAccess.length = 0;
+  dispatchWindow('storage', { key: storageKeys.otherCart, storageArea: s.localStorage });
+  assert.deepEqual(storageAccess, []); assert.equal(element('confirm-dialog').open, true);
+  assert.equal(evaluate('state.confirm'), confirm);
+  approve(); assert.deepEqual(context.cart(), []); assert.equal(memory.get(storageKeys.otherCart), unrelated);
+  assert.equal(element('confirm-dialog').open, false);
+});
+
+test('the Clear order action clears only this site and leaves every unrelated storage entry unchanged', () => {
+  const untouched = [[storageKeys.otherCart, JSON.stringify([item({ quantity: 9, price: 36 })])],
+    [storageKeys.sharedCart, JSON.stringify([item({ quantity: 7 })])], [storageKeys.sharedReset, 'done'],
+    ['bestProducts1SkuCartV2', 'conversion website cart'], ['personalOtherApp', 'keep me'],
+    [site.cache, 'products cache'], ['bestProducts1CatalogPreviewCartV1', 'preview cart']];
+  const context = createContext({ initialStorage: [[storageKeys.cart, JSON.stringify([item({ quantity: 3 })])], ...untouched] });
+  const { sandbox: s, element, dispatchDocument, approve, storageAccess, memory } = context;
+  s.perfumeDB = [product()]; s.openCart(); storageAccess.length = 0;
+  const trigger = element('clear-order-trigger'); trigger.dataset.action = 'clear-cart';
+  dispatchDocument('click', { target: trigger });
+  assert.equal(element('confirm-dialog').open, true); assert.equal(context.cart()[0].quantity, 3);
+  approve(); assert.deepEqual(context.cart(), []); assert.equal(element('cart-count').textContent, 0);
+  assert.equal(element('mobile-order-bar').hidden, true);
+  for (const [key, value] of untouched) assert.equal(memory.get(key), value, key);
+  assert.ok(storageAccess.every(([, key]) => key === storageKeys.cart), 'order clearing must touch only this cart key');
+});
+
+test('invalid own cart data remains isolated and never falls back to another valid cart', () => {
+  const shared = JSON.stringify([item({ quantity: 90 })]), other = JSON.stringify([item({ quantity: 5, price: 36 })]);
+  for (const invalid of ['broken', '{}', 'null', 'false', '42', '"wrong type"']) {
+    const context = createContext({ initialStorage: [[storageKeys.cart, invalid],
+      [storageKeys.sharedCart, shared], [storageKeys.otherCart, other]] });
+    const { sandbox: s, memory, dispatchWindow, element } = context;
+    assert.deepEqual(context.cart(), []); assert.equal(element('mobile-order-bar').hidden, true);
+    dispatchWindow('storage', { key: storageKeys.cart, storageArea: s.localStorage });
+    assert.equal(element('cart-count').textContent, 0);
+    s.writeStoredCart([item({ quantity: 2 })]); assert.equal(context.cart()[0].quantity, 2);
+    assert.equal(memory.get(storageKeys.sharedCart), shared); assert.equal(memory.get(storageKeys.otherCart), other);
+  }
 });
 
 test('Coming Soon with missing stock and legacy AVAILABLE status is never purchasable or sent', () => {
@@ -1282,7 +1463,7 @@ test('invalid and over-stock drafts restore the latest saved total with an expli
   }
   assert.match(element('toast').textContent, /up to 19 pcs/);
   editQuantity(context, input, '30');
-  setCart([item({ quantity: 7 })]); context.dispatchWindow('storage'); input.blur();
+  setCart([item({ quantity: 7 })]); context.dispatchWindow('storage', { key: storageKeys.cart }); input.blur();
   assert.equal(cart()[0].quantity, 7); assert.equal(input.value, '7');
 });
 
@@ -1294,7 +1475,7 @@ test('storage sync preserves an active draft and selection, then commit uses lat
   editQuantity(context, input, '12'); input.setSelectionRange(1, 1);
   const newest = item({ quantity: 7, price: 41, ml: '50', img: 'saved-other.webp' });
   const unrelated = item({ name: 'IL-B001', warehouse: 'IL', quantity: 3 });
-  setCart([newest, unrelated]); dispatchWindow('storage');
+  setCart([newest, unrelated]); dispatchWindow('storage', { key: storageKeys.cart });
   assert.equal(input.value, '12'); assert.equal(input.selectionStart, 1); assert.equal(input.selectionEnd, 1);
   assert.equal(s.document.activeElement, input); assert.equal(mounted.nodes.input, input);
   quantityKey(context, input, 'Enter');
@@ -1372,7 +1553,7 @@ test('a draft cannot recreate an item removed in another window, and checking st
   const { sandbox: s, setCart, cart, element, evaluate } = context;
   const p = product(); s.perfumeDB = [p]; setCart([item({ quantity: 4 })]); evaluate('state.loaded = true');
   const mounted = mountStableCard(context, p), input = mounted.nodes.input;
-  editQuantity(context, input, '12'); setCart([]); context.dispatchWindow('storage');
+  editQuantity(context, input, '12'); setCart([]); context.dispatchWindow('storage', { key: storageKeys.cart });
   assert.equal(mounted.nodes.input, input); assert.equal(input.value, '12');
   quantityKey(context, input, 'Enter');
   assert.deepEqual(cart(), []); assert.match(element('toast').textContent, /removed in another window/);

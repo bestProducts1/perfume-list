@@ -636,7 +636,11 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   });
 });
 document.addEventListener('error',(event)=>{if(event.target.tagName==='IMG'){event.target.style.visibility='hidden';event.target.setAttribute('aria-hidden','true');}},true);
-window.addEventListener('storage',()=>{updateOrderUI();});
+window.addEventListener('storage',event=>{
+  if(event.storageArea&&event.storageArea!==localStorage)return;
+  if(event.key!=null&&event.key!==CART_STORAGE_KEY)return;
+  updateOrderUI();
+});
 window.addEventListener('pageshow',()=>{updateOrderUI();});
 window.addEventListener('resize',syncToastHost);
 function applyStorefrontCopy(){
