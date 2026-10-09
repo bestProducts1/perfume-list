@@ -42,6 +42,8 @@ const storageKeys = {
   otherCart: `bestProducts1:${isCatalog ? 'perfume-list' : 'catalog'}:cart:v1`,
   sharedCart: 'bestProducts1SharedCartV3',
   sharedReset: 'bestProducts1SharedCartResetV3',
+  inquiry: 'bestProducts1:sku:inquiry:v1',
+  receipt: `bestProducts1:${site.id}:sku-inquiry-applied:v1`,
 };
 
 // Load the production configuration, production data module and real page handlers.
@@ -171,6 +173,7 @@ function createContext({ initialStorage = [], sharedStorage, storefrontId = site
   if (storefrontId !== site.id) {
     sandbox.STOREFRONT_CONFIG = Object.freeze({ ...sandbox.STOREFRONT_CONFIG, siteId: storefrontId });
   }
+  vm.runInContext(source('inquiry-sync.js'), sandbox, { filename: 'inquiry-sync.js' });
   vm.runInContext(source('db.js'), sandbox, { filename: 'db.js' });
   const app = source('app.mjs').replace(/^import[^\n]*\n/gm, '');
   vm.runInContext(app, sandbox, { filename: 'app.mjs' });
@@ -1599,4 +1602,241 @@ test('warehouse summaries use cents and normalized warehouses while savings hide
   assert.equal(element('mobile-order-savings').hidden, false);
   assert.equal(element('mobile-order-savings').textContent, `${s.formatDiscountPercent(expected.discountPercent)}% off · Saved $${expected.discountAmount.toFixed(2)}`);
   assert.match(element('mobile-order-quantity').textContent, /^25 items · /);
+});
+
+const inquiry = (items = [{ sku: 'TX-A055', warehouse: 'TX', quantity: 3 }], revision = 'inquiry-test-1') => ({
+  version: 1, source: 'SKU', revision, createdAt: Date.now(), items,
+});
+function seedInquiry(context, payload = inquiry()) {
+  context.memory.set(storageKeys.inquiry, JSON.stringify(payload));
+}
+
+test('SKU handoff helper loads before product data and its receiver cache version changes', () => {
+  const html = source('index.html');
+  assert.match(html, /inquiry-sync\.js\?v=20261009-sku-inquiry/);
+  assert.ok(html.indexOf('inquiry-sync.js') < html.indexOf('db.js'));
+  assert.match(html, /app\.mjs\?v=20261009-sku-inquiry/);
+  assert.match(html, /db\.js\?v=20261009-cart-isolation/);
+});
+
+test('a SKU handoff replaces the scoped order with exact own warehouse products and own quote metadata', () => {
+  const context = createContext();
+  const { sandbox: s, setCart, cart, memory, element } = context;
+  const p = product({ price: 26, ml: '75', img: 'local-photo.webp', name: 'Local table name', brand: 'Local Brand', stock: 100 });
+  const il = product({ id: 'IL-B001', warehouse: 'IL', price: 45, ml: '50', stock: 100 });
+  setCart([item({ name: 'IL-OLD', warehouse: 'IL', price: 1, quantity: 77 })]);
+  memory.set(storageKeys.otherCart, JSON.stringify([item({ price: 36, quantity: 99 })]));
+  seedInquiry(context, inquiry([{ sku: p.id, warehouse: 'TX', quantity: 7 }, { sku: il.id, warehouse: 'IL', quantity: 2 }]));
+  s.perfumeDB = [p, il]; s.renderHome();
+  assert.deepEqual(cart(), [
+    item({ caption: 'TX-A055 - Local table name', brand: 'Local Brand', price: 26, quantity: 7, ml: '75', img: 'local-photo.webp' }),
+    item({ name: 'IL-B001', warehouse: 'IL', caption: 'IL-B001 - New York Nights', price: 45, quantity: 2, ml: '50' }),
+  ]);
+  assert.equal(memory.get(storageKeys.receipt), 'inquiry-test-1');
+  assert.equal(JSON.parse(memory.get(storageKeys.otherCart))[0].quantity, 99);
+  const expected = model.getOrderSummary(cart(), site.tiers);
+  assert.equal(element('mobile-order-total').textContent, '$' + expected.totalAmount.toFixed(2));
+  assert.equal(element('cart-count').textContent, 9);
+  assert.match(element('toast').textContent, /Imported 9 pcs from SKU/);
+  assert.doesNotMatch(element('cart-validation').textContent, /price.*changed|different.*price/i);
+});
+
+test('each directory consumes the same price-free inquiry once and retains independent prices and edits', () => {
+  const sharedStorage = new Map();
+  const own = createContext({ sharedStorage });
+  const otherId = isCatalog ? 'perfume-list' : 'catalog';
+  const other = createContext({ sharedStorage, storefrontId: otherId });
+  seedInquiry(own, inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 8 }]));
+  own.sandbox.perfumeDB = [product({ price: 26, stock: 100 })];
+  other.sandbox.perfumeDB = [product({ price: 36, stock: 100, ml: '50', img: 'other-photo.webp' })];
+  own.sandbox.renderHome(); other.sandbox.renderHome();
+  assert.equal(own.cart()[0].quantity, 8); assert.equal(other.cart()[0].quantity, 8);
+  assert.equal(own.cart()[0].price, 26); assert.equal(other.cart()[0].price, 36);
+  assert.equal(other.cart()[0].ml, '50'); assert.equal(other.cart()[0].img, 'other-photo.webp');
+  assert.equal(sharedStorage.get(own.sandbox.SkuInquirySync.receiptKey(site.id)), 'inquiry-test-1');
+  assert.equal(sharedStorage.get(other.sandbox.SkuInquirySync.receiptKey(otherId)), 'inquiry-test-1');
+  own.sandbox.setProductQuantity('TX-A055::TX', '5'); other.sandbox.renderHome();
+  assert.equal(own.cart()[0].quantity, 5); assert.equal(other.cart()[0].quantity, 8);
+  other.sandbox.clearStoredCart(); other.sandbox.updateOrderUI();
+  assert.deepEqual(other.cart(), []); assert.equal(own.cart()[0].quantity, 5);
+  const refreshed = createContext({ sharedStorage, storefrontId: otherId });
+  refreshed.sandbox.perfumeDB = [product({ price: 36, stock: 100 })]; refreshed.sandbox.renderHome();
+  assert.deepEqual(refreshed.cart(), [], 'refresh must not resurrect a cleared already-imported inquiry');
+});
+
+test('receipt idempotence preserves edited quantities and saved commercial data across refreshes', () => {
+  const context = createContext(); seedInquiry(context);
+  context.sandbox.perfumeDB = [product({ price: 26, stock: 100 })]; context.sandbox.renderHome();
+  context.setCart([item({ price: 26, quantity: 12 })]);
+  const refreshed = createContext({ sharedStorage: context.memory });
+  refreshed.sandbox.perfumeDB = [product({ price: 36, stock: 100 })]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.cart()[0].quantity, 12); assert.equal(refreshed.cart()[0].price, 26);
+  assert.equal(refreshed.element('toast').textContent, '');
+});
+
+test('a new inquiry waits for a real page refresh rather than later rendering, storage or pageshow', () => {
+  const context = createContext(); seedInquiry(context);
+  const { sandbox: s, memory, cart, dispatchWindow, evaluate } = context;
+  s.perfumeDB = [product({ stock: 100 })]; s.renderHome();
+  s.setProductQuantity('TX-A055::TX', '4');
+  seedInquiry(context, inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 9 }], 'inquiry-test-2'));
+  dispatchWindow('storage', { key: storageKeys.inquiry, storageArea: s.localStorage });
+  dispatchWindow('pageshow'); s.renderHome();
+  evaluate('state.checking = true'); s.renderHome(); evaluate('state.checking = false'); s.renderHome();
+  assert.equal(cart()[0].quantity, 4); assert.equal(memory.get(storageKeys.receipt), 'inquiry-test-1');
+  const refreshed = createContext({ sharedStorage: memory });
+  refreshed.sandbox.perfumeDB = [product({ stock: 100 })]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.cart()[0].quantity, 9); assert.equal(memory.get(storageKeys.receipt), 'inquiry-test-2');
+});
+
+test('no inquiry on initial load prevents a later paste being consumed during checkout re-render', () => {
+  const context = createContext(); const { sandbox: s, cart, memory } = context;
+  s.perfumeDB = [product()]; s.renderHome(); s.addToOrder('TX-A055::TX');
+  seedInquiry(context); s.renderHome();
+  assert.equal(cart()[0].quantity, 1); assert.equal(memory.has(storageKeys.receipt), false);
+  const refreshed = createContext({ sharedStorage: memory });
+  refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.cart()[0].quantity, 3);
+});
+
+test('empty product loading cannot consume or acknowledge an inquiry before the table arrives', () => {
+  const context = createContext(); seedInquiry(context);
+  context.sandbox.renderHome();
+  assert.deepEqual(context.cart(), []); assert.equal(context.memory.has(storageKeys.receipt), false);
+  context.sandbox.perfumeDB = [product()]; context.sandbox.renderHome();
+  assert.equal(context.cart()[0].quantity, 3); assert.equal(context.memory.get(storageKeys.receipt), 'inquiry-test-1');
+});
+
+test('a first render during checkout checking cannot import and later quantity renders do not retry it', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 2 })]);
+  context.sandbox.perfumeDB = [product()]; context.evaluate('state.checking = true'); context.sandbox.renderHome();
+  context.evaluate('state.checking = false'); context.sandbox.renderHome(); context.sandbox.updateOrderUI();
+  assert.equal(context.cart()[0].quantity, 2); assert.equal(context.memory.has(storageKeys.receipt), false);
+});
+
+test('unmatched warehouse references never fall back to another warehouse or erase an existing order', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 7 })]);
+  context.sandbox.perfumeDB = [product({ warehouse: 'IL' })]; context.sandbox.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(context.memory.get(storageKeys.receipt), 'inquiry-test-1');
+  assert.match(context.element('cart-validation').textContent, /TX-A055 \(TX\): not listed in this warehouse/);
+  assert.match(context.element('toast').textContent, /existing order was kept/);
+  const refreshed = createContext({ sharedStorage: context.memory });
+  refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.cart()[0].quantity, 7, 'same rejected revision is not retried automatically against a changed table');
+});
+
+test('partial imports skip unavailable, low-stock, coming-soon and price-pending rows and cap local inventory explicitly', () => {
+  const context = createContext(); const { sandbox: s, cart, element } = context;
+  const requested = ['TX-A055', 'IL-B001', 'IL-B002', 'IL-B003', 'IL-B004', 'IL-B999']
+    .map((sku, index) => ({ sku, warehouse: sku.split('-')[0], quantity: index ? 2 : 30 }));
+  seedInquiry(context, inquiry(requested));
+  s.perfumeDB = [product({ price: 26, stock: 19 }),
+    product({ id: 'IL-B001', warehouse: 'IL', stock: 0 }),
+    product({ id: 'IL-B002', warehouse: 'IL', stock: 18 }),
+    product({ id: 'IL-B003', warehouse: 'IL', stock: 0, coming_soon_weight: 1 }),
+    product({ id: 'IL-B004', warehouse: 'IL', price: 0, stock: 100 })];
+  s.renderHome();
+  assert.deepEqual(cart(), [item({ price: 26, quantity: 19 })]);
+  const notice = element('cart-validation').textContent;
+  assert.match(notice, /30 requested, 19 added \(available stock\)/);
+  assert.match(notice, /IL-B001 \(IL\): unavailable/); assert.match(notice, /IL-B002 \(IL\): unavailable/);
+  assert.match(notice, /IL-B003 \(IL\): arriving soon/); assert.match(notice, /IL-B004 \(IL\): price pending/);
+  assert.match(notice, /IL-B999 \(IL\): not listed/); assert.equal(element('cart-validation').dataset.state, 'error');
+  assert.match(element('toast').textContent, /Review the skipped items or quantity adjustments/);
+});
+
+test('all unavailable inquiry products retain the old raw scoped order while acknowledging the attempt', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 11, price: 22 })]);
+  const raw = context.memory.get(storageKeys.cart);
+  context.sandbox.perfumeDB = [product({ stock: 18 })]; context.sandbox.renderHome();
+  assert.equal(context.memory.get(storageKeys.cart), raw); assert.equal(context.memory.get(storageKeys.receipt), 'inquiry-test-1');
+  assert.match(context.element('cart-validation').textContent, /No SKU products could be added/);
+});
+
+test('malformed, foreign or price-bearing inquiry envelopes are not imported or acknowledged', () => {
+  const invalid = [null, {}, { ...inquiry(), version: 2 }, { ...inquiry(), source: 'catalog' },
+    { ...inquiry(), revision: '' }, { ...inquiry(), createdAt: 'today' }, inquiry([]),
+    inquiry([{ sku: 'B10', warehouse: 'IL', quantity: 1 }]),
+    inquiry([{ sku: 'TX-A055', warehouse: 'IL', quantity: 1 }]),
+    inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 1.5 }]),
+    inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 1, price: 1 }])];
+  for (const payload of invalid) {
+    const context = createContext(); seedInquiry(context, payload); context.setCart([item({ quantity: 7 })]);
+    context.sandbox.perfumeDB = [product()]; context.sandbox.renderHome();
+    assert.equal(context.cart()[0].quantity, 7); assert.equal(context.memory.has(storageKeys.receipt), false);
+    assert.equal(context.element('toast').textContent, '');
+  }
+  const broken = createContext(); broken.memory.set(storageKeys.inquiry, '{bad JSON'); broken.setCart([item({ quantity: 4 })]);
+  broken.sandbox.perfumeDB = [product()]; broken.sandbox.renderHome();
+  assert.equal(broken.cart()[0].quantity, 4); assert.equal(broken.memory.has(storageKeys.receipt), false);
+});
+
+test('receipt read failure blocks the import without changing either scoped order', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 7 })]);
+  const { sandbox: s, memory } = context; const get = s.localStorage.getItem;
+  s.localStorage.getItem = (key) => { if (key === storageKeys.receipt) throw new Error('blocked'); return get(key); };
+  s.perfumeDB = [product()]; s.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be read.*order was not changed/);
+});
+
+test('failed cart writes never acknowledge or report a successful inquiry import', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 7 })]);
+  const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+  s.localStorage.setItem = (key, value) => { if (key === storageKeys.cart) throw new Error('quota'); return set(key, value); };
+  s.perfumeDB = [product()]; s.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be saved.*previous order was kept/);
+  assert.doesNotMatch(context.element('toast').textContent, /Imported/);
+});
+
+test('receipt write failure rolls back the exact previous raw cart and leaves the revision retryable', () => {
+  for (const previous of [null, JSON.stringify([item({ price: 22, quantity: 7 })])]) {
+    const context = createContext(); seedInquiry(context); if (previous !== null) context.memory.set(storageKeys.cart, previous);
+    const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+    s.localStorage.setItem = (key, value) => { if (key === storageKeys.receipt) throw new Error('quota'); return set(key, value); };
+    s.perfumeDB = [product()]; s.renderHome();
+    assert.equal(memory.get(storageKeys.cart) ?? null, previous); assert.equal(memory.has(storageKeys.receipt), false);
+    assert.match(context.element('toast').textContent, /previous order was kept/);
+    const refreshed = createContext({ sharedStorage: memory }); refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
+    assert.equal(refreshed.cart()[0].quantity, 3); assert.equal(memory.get(storageKeys.receipt), 'inquiry-test-1');
+  }
+});
+
+test('failed receipt rollback does not overwrite a newer same-site edit made during storage failure', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 7 })]);
+  const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+  const newer = JSON.stringify([item({ quantity: 12, price: 36 })]);
+  s.localStorage.setItem = (key, value) => {
+    if (key === storageKeys.receipt) { memory.set(storageKeys.cart, newer); throw new Error('quota'); }
+    return set(key, value);
+  };
+  s.perfumeDB = [product()]; s.renderHome();
+  assert.equal(memory.get(storageKeys.cart), newer); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be saved completely.*Review your order/);
+});
+
+test('failed unmatched-inquiry receipt persistence keeps the old order and does not claim acknowledgement', () => {
+  const context = createContext(); seedInquiry(context); context.setCart([item({ quantity: 7 })]);
+  const { sandbox: s, memory } = context; const set = s.localStorage.setItem;
+  s.localStorage.setItem = (key, value) => { if (key === storageKeys.receipt) throw new Error('blocked'); return set(key, value); };
+  s.perfumeDB = [product({ id: 'IL-B001', warehouse: 'IL' })]; s.renderHome();
+  assert.equal(context.cart()[0].quantity, 7); assert.equal(memory.has(storageKeys.receipt), false);
+  assert.match(context.element('toast').textContent, /could not be saved/);
+});
+
+test('each new inquiry replaces rather than appends and leaves unrelated storage completely unchanged', () => {
+  const untouched = [[storageKeys.otherCart, JSON.stringify([item({ quantity: 99, price: 36 })])],
+    [storageKeys.sharedCart, JSON.stringify([item({ quantity: 55 })])], [storageKeys.sharedReset, 'done'],
+    ['bestProducts1SkuCartV2', JSON.stringify([item({ quantity: 18 })])]];
+  const context = createContext({ initialStorage: untouched }); context.setCart([item({ quantity: 7 })]);
+  seedInquiry(context, inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 2 }]));
+  context.sandbox.perfumeDB = [product()]; context.sandbox.renderHome();
+  assert.equal(context.cart()[0].quantity, 2);
+  for (const [key, value] of untouched) assert.equal(context.memory.get(key), value, key);
+  context.sandbox.clearStoredCart();
+  seedInquiry(context, inquiry([{ sku: 'TX-A055', warehouse: 'TX', quantity: 5 }], 'inquiry-test-2'));
+  const refreshed = createContext({ sharedStorage: context.memory }); refreshed.sandbox.perfumeDB = [product()]; refreshed.sandbox.renderHome();
+  assert.equal(refreshed.cart()[0].quantity, 5);
+  for (const [key, value] of untouched) assert.equal(context.memory.get(key), value, key);
 });

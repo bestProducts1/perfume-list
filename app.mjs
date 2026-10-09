@@ -16,6 +16,7 @@ const defaults = {category:'All',warehouse:'all',brand:'all',priceRange:'any',so
 const state = {filters:{...defaults},view:'grid',limit:24,detailId:null,checking:false,confirm:null,loaded:false};
 try {state.view=localStorage.getItem(layoutKey)==='list'?'list':'grid';} catch {}
 let cartEntryHandled=false;
+let skuInquiryEntryHandled=false;
 let toastTimer;
 let queryTimer;
 let loadTimer;
@@ -63,6 +64,74 @@ function getProduct(reference){return products().find(p=>stockKey(p)===reference
 function quantityInCart(product){return readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)===stockKey(product)).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function quantityForReference(reference,cart=readCart()){return cart.filter(item=>window.cartStockKey(item.name,item.warehouse)===reference).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function remainingStock(product){return Math.max(0,window.getOrderStockLimit(product)-quantityInCart(product));}
+
+function importPendingSkuInquiry(){
+  // SKU hands off quantities once per page load. Subsequent renders and storage
+  // notifications must never restore items that the user edited or cleared.
+  if(skuInquiryEntryHandled)return;
+  skuInquiryEntryHandled=true;
+  if(state.checking||!window.SkuInquirySync)return;
+  let payload,receiptKey,previousReceipt,previousCart;
+  try{
+    payload=window.SkuInquirySync.read();
+    if(!payload)return;
+    receiptKey=window.SkuInquirySync.receiptKey(storefront.siteId);
+    previousReceipt=localStorage.getItem(receiptKey);
+    if(previousReceipt===payload.revision)return;
+    previousCart=localStorage.getItem(CART_STORAGE_KEY);
+  }catch{
+    showToast('The SKU list could not be read. Your order was not changed.');
+    return;
+  }
+  const ownProducts=new Map(products().map(product=>[stockKey(product),product]));
+  const imported=[],notices=[];
+  for(const requested of payload.items){
+    const product=ownProducts.get(window.cartStockKey(requested.sku,requested.warehouse));
+    if(!product){notices.push(`${requested.sku} (${requested.warehouse}): not listed in this warehouse.`);continue;}
+    if(isComingSoon(product)){notices.push(`${requested.sku} (${requested.warehouse}): arriving soon, not added.`);continue;}
+    if(!Number.isFinite(Number(product.price))||Number(product.price)<=0){notices.push(`${requested.sku} (${requested.warehouse}): price pending, not added.`);continue;}
+    const limit=window.getOrderStockLimit(product);
+    if(limit<=0){notices.push(`${requested.sku} (${requested.warehouse}): unavailable, not added.`);continue;}
+    const quantity=Math.min(requested.quantity,limit);
+    if(quantity<requested.quantity)notices.push(`${requested.sku} (${requested.warehouse}): ${requested.quantity} requested, ${quantity} added (available stock).`);
+    // Import no commercial data from SKU: every quote and product detail belongs
+    // to this storefront's own table and its selected warehouse.
+    imported.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
+  }
+  const serialized=JSON.stringify(imported);
+  let cartWritten=false;
+  try{
+    // A wholly unmatched handoff must not destroy an existing order. Remember
+    // its revision so the same warning does not repeat on each refresh.
+    if(imported.length){localStorage.setItem(CART_STORAGE_KEY,serialized);cartWritten=true;}
+    localStorage.setItem(receiptKey,payload.revision);
+  }catch{
+    // localStorage has no transaction. Restore the original raw cart if writing
+    // the receipt fails, without overwriting a newer change from another tab.
+    let restored=!cartWritten;
+    if(cartWritten){
+      try{
+        if(localStorage.getItem(CART_STORAGE_KEY)===serialized){
+          if(previousCart===null)localStorage.removeItem(CART_STORAGE_KEY);
+          else localStorage.setItem(CART_STORAGE_KEY,previousCart);
+          restored=true;
+        }
+      }catch{}
+    }
+    try{
+      if(localStorage.getItem(receiptKey)===payload.revision){
+        if(previousReceipt===null)localStorage.removeItem(receiptKey);
+        else localStorage.setItem(receiptKey,previousReceipt);
+      }
+    }catch{}
+    const message=restored?'The SKU list could not be saved. Your previous order was kept. Refresh to retry.':'The SKU list could not be saved completely. Review your order before checkout, then refresh to retry.';
+    setValidation(message,'error');showToast(message);return;
+  }
+  const quantity=imported.reduce((sum,item)=>sum+item.quantity,0);
+  const message=imported.length?`Imported ${quantity} ${quantity===1?'pc':'pcs'} from SKU into this site’s order.`:'No SKU products could be added. Your existing order was kept.';
+  setValidation([message,...notices].join('\n'),notices.length?'error':'ready');
+  showToast(notices.length&&imported.length?`${message} Review the skipped items or quantity adjustments in your order.`:message);
+}
 
 function syncToastHost(){
   const host=dialogStack.filter(dialog=>dialog.open).at(-1)||document.body;
@@ -212,7 +281,7 @@ function populateBrands(){
 
 window.renderHome=function(){
   if(!products().length)return;
-  clearTimeout(loadTimer);state.loaded=true;populateFilters();renderProducts();updateOrderUI();
+  clearTimeout(loadTimer);state.loaded=true;importPendingSkuInquiry();populateFilters();renderProducts();updateOrderUI();
   if($('product-dialog').open){const product=getProduct(state.detailId);if(product)renderDetail(product);}
   if(!cartEntryHandled&&new URLSearchParams(window.location.search).get('cart')==='1'){cartEntryHandled=true;openCart();}
 };
