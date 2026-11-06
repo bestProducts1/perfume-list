@@ -89,25 +89,59 @@ function isOrderable(product) {
   const status = String(product?.stock_status || '').trim().toUpperCase();
   if (!Number.isFinite(price) || price <= 0 || BLOCKED_STATUSES.has(status) || isComingSoon(product)) return false;
   const stock = stockOf(product);
-  return Number.isFinite(stock) ? stock >= MIN_STOCK : status === 'AVAILABLE';
+  return Number.isFinite(stock) ? stock >= (isShoe(product)?1:MIN_STOCK) : !isShoe(product)&&status === 'AVAILABLE';
 }
 
 export function isComingSoon(product) {
-  return positiveWeight(product, 'coming_soon_weight') < Infinity && !(stockOf(product) >= MIN_STOCK);
+  return positiveWeight(product, 'coming_soon_weight') < Infinity && !(stockOf(product) >= (isShoe(product)?1:MIN_STOCK));
 }
 
 function warehouseCode(value) {
   return String(value || '').trim().toUpperCase().replace(/\s+WAREHOUSE$/, '').trim();
 }
 
+export function isShoe(product) { return /^[A-Z]+-XZ-/i.test(String(product?.id || product?.sku || product?.name || '').trim()); }
+
+export function isGiftSet(product){
+  if(isShoe(product))return false;
+  const id=String(product?.id||product?.sku||product?.name||'');
+  const title=String(product?.name||'')+' '+String(product?.caption||'');
+  return /^[A-Z]+-LH-/i.test(id)||/\b(sets?|gift\s*box|bundle|combo|combination)\b|组合|套装|礼盒/i.test(title)||/^box$/i.test(title.trim())||/\d+(?:\.\d+)?\s*ml\s*[*×x]\s*\d+/i.test(String(product?.ml||''));
+}
+export function productIdentity(product){return isShoe(product)?{product_type:'shoe',parent_sku:String(product?.parent_sku||''),size:String(product?.size||'')}:isGiftSet(product)?{product_type:'set'}:{};}
+export function productSpec(product){return isShoe(product)?(String(product?.size||'').trim()? 'Size '+String(product.size).trim():'Size details pending'):formatSize(product?.ml);}
+export function orderStockLimit(product){
+  if(!product||isComingSoon(product)||!Number.isFinite(Number(product.price))||!(Number(product.price)>0)||BLOCKED_STATUSES.has(String(product.stock_status||'').trim().toUpperCase()))return 0;
+  if(isShoe(product)){
+    const size=String(product.size||'').trim(),parent=String(product.parent_sku||'').trim().toUpperCase();
+    if(!size||!parent||String(product.id||product.sku||'').trim().toUpperCase()!==parent+'-'+size.toUpperCase())return 0;
+  }
+  const stock=stockOf(product);return Number.isFinite(stock)?(stock>=(isShoe(product)?1:MIN_STOCK)?Math.floor(stock):0):!isShoe(product)&&String(product.stock_status).toUpperCase()==='AVAILABLE'?Number.MAX_SAFE_INTEGER:0;
+}
+export function shoeFamily(product){return String(product.parent_sku||product.id||product.sku||'').trim()+'::'+warehouseCode(product.warehouse);}
+export function groupShoeProducts(rows,all=rows){
+  const seen=new Set();return rows.flatMap(product=>{if(!isShoe(product))return [product];const key=shoeFamily(product);if(seen.has(key))return [];seen.add(key);return [{...product,variants:all.filter(p=>isShoe(p)&&shoeFamily(p)===key).sort((a,b)=>String(a.size||'').localeCompare(String(b.size||''),'en',{numeric:true}))}];});
+}
+
+export function seasonLabel(value) {
+  const key=normalizeText(value);
+  if(['all season','all seasons','year round','yearround'].includes(key))return 'Year-round';
+  if(key==='spring summer')return 'Spring / Summer';
+  if(key==='fall winter'||key==='autumn winter')return 'Fall / Winter';
+  if(key==='varies')return 'Varies by fragrance';
+  return String(value||'').trim();
+}
+const OCCASION_LABELS={'daily wear':'Everyday','date':'Date Night','evening':'Evening Out','outdoor':'Outdoors'};
+export function productOccasions(product) {
+  return [...new Set(String(product?.suitable_occasions||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>OCCASION_LABELS[normalizeText(value)]||value))];
+}
+
 function categoryMatches(product, category) {
+  if(category==='Shoes')return isShoe(product);
+  if(isShoe(product)&&['Men','Women','Unisex','GiftSets'].includes(category))return false;
   const gender = normalizeText(product.gender || product.target);
   if (category === 'Men' || category === 'Women' || category === 'Unisex') return gender === normalizeText(category);
-  if (category === 'GiftSets') {
-    const size = String(product.ml ?? '');
-    return /\b(set|gift\s*box)\b/i.test(String(product.name ?? '')) ||
-      /\bset\b/i.test(size) || /\d+(?:\.\d+)?\s*ml\s*[*×x]\s*\d+/i.test(size);
-  }
+  if(category==='GiftSets')return isGiftSet(product);
   if (category === 'HotSelling') return positiveWeight(product, 'hot_selling_weight') < Infinity;
   if (category === 'NewArrival') return positiveWeight(product, 'new_arrival_weight') < Infinity;
   return true;
@@ -124,6 +158,11 @@ export function selectProducts(products, filters = {}) {
       category === 'HotSelling' || category === 'NewArrival' ? orderable :
         orderable || (filters.stockOnly === false && isComingSoon(product));
     if (!eligible || !categoryMatches(product, category)) return false;
+    if(category!=='Shoes'){
+      const selected=seasonLabel(filters.season),actual=seasonLabel(product.season);
+      if(selected&&selected!=='all'&&actual!==selected&&!(actual==='Year-round'&&['Spring / Summer','Fall / Winter'].includes(selected)))return false;
+      if(filters.occasion&&filters.occasion!=='all'&&!productOccasions(product).some(value=>normalizeText(value)===normalizeText(filters.occasion)))return false;
+    }
     if (warehouse && warehouse !== 'ALL' && warehouseCode(product.warehouse) !== warehouse) return false;
     if (brand && brand !== 'all' && normalizeText(product.brand) !== brand) return false;
     const price = Number(product.price);
@@ -131,6 +170,9 @@ export function selectProducts(products, filters = {}) {
     if (priceRange === 'under30' && !(price < 30)) return false;
     if (priceRange === '30to40' && !(price >= 30 && price <= 40)) return false;
     if (priceRange === 'over40' && !(price > 40)) return false;
+    if (priceRange === 'under150' && !(price < 150)) return false;
+    if (priceRange === '150to200' && !(price >= 150 && price <= 200)) return false;
+    if (priceRange === 'over200' && !(price > 200)) return false;
     return true;
   });
   if (filters.query || filters.search) result = searchProducts(result, filters.query || filters.search);
@@ -155,10 +197,11 @@ export function selectProducts(products, filters = {}) {
   }).map(({ product }) => product);
 }
 
-export function getOrderSummary(items, tiers = []) {
+export function getOrderSummary(items, tiers = [], catalog = []) {
   let qty = 0;
   let subtotalCents = 0;
   let lvQty = 0;
+  let discountQty=0,discountSubtotalCents=0;
   for (const item of Array.isArray(items) ? items : []) {
     const rawQuantity = Number(item?.quantity);
     const quantity = Number.isFinite(rawQuantity) ? Math.max(0, Math.floor(rawQuantity)) : 0;
@@ -167,14 +210,17 @@ export function getOrderSummary(items, tiers = []) {
     const priceCents = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round((rawPrice + Number.EPSILON) * 100) : 0;
     qty += quantity;
     subtotalCents += priceCents * quantity;
+    const current=catalog.find(p=>String(p.id||p.sku).toUpperCase()===String(item.name||item.id||item.sku).toUpperCase()&&warehouseCode(p.warehouse)===warehouseCode(item.warehouse));
+    const identity=current||item;
+    if(!isShoe(identity)&&!isGiftSet(identity)&&identity.product_type!=='shoe'&&identity.product_type!=='set'){discountQty+=quantity;discountSubtotalCents+=priceCents*quantity;}
     if (`${normalizeText(item.brand)} ${normalizeText(item.caption)}`.replace(/\s+/g, '').includes('louisvuitton')) lvQty += quantity;
   }
-  const tier = (Array.isArray(tiers) ? tiers : []).find(({ min, max }) => qty >= min && qty <= max);
+  const tier = (Array.isArray(tiers) ? tiers : []).find(({ min, max }) => discountQty >= min && discountQty <= max);
   const rawPercent = Number(tier?.percent);
   const discountPercent = Number.isFinite(rawPercent) && rawPercent > 0 ? rawPercent : 0;
-  const discountCents = Math.round((subtotalCents * discountPercent) + Number.EPSILON);
+  const discountCents = Math.round((discountSubtotalCents * discountPercent) + Number.EPSILON);
   return {
-    qty, subtotal: subtotalCents / 100, discountPercent,
+    qty, subtotal: subtotalCents / 100, discountPercent, discountQty,discountSubtotal:discountSubtotalCents/100,fullPriceQty:qty-discountQty,fullPriceSubtotal:(subtotalCents-discountSubtotalCents)/100,
     discountAmount: discountCents / 100,
     totalAmount: (subtotalCents - discountCents) / 100,
     lvQty, otherQty: qty - lvQty,

@@ -123,6 +123,26 @@ body.catalog-list-view .quick-categories{display:none}
   .detail-photo{height:min(260px,44dvh)}
 }
 
+.shoe-sizes{margin:20px 0 8px;padding-top:16px;border-top:1px solid var(--line)}
+.shoe-size-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.shoe-size-heading h3{margin:0;font-size:12px}.shoe-size-heading>span{font-size:10px;color:var(--muted)}
+.shoe-size-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.shoe-size-button{border:1px solid #dedee3;border-radius:8px;padding:10px 5px;font-size:14px;min-height:54px;background:#fff}.shoe-size-button small{display:block;font-size:9px;margin-top:4px;color:#777780}
+.shoe-size-button[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:white}.shoe-size-button[aria-pressed=true] small{color:#ddd}.shoe-size-button:disabled{background:#f4f4f5;color:#b0b0b5;text-decoration:line-through;cursor:not-allowed}
+.size-pending{font-size:12px;line-height:1.6;color:var(--muted)}
+/* Product families and fragrance discovery, using the existing picker system. */
+.quick-icon.shoes{background:#eff5f3;color:#52766b}
+.fragrance-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:calc(50% - 6px);margin:12px 0 0 calc(25% + 3px)}
+.product-scent{font-size:11px;line-height:1.55;color:#777780;margin:5px 0 7px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:34px}
+.fragrance-details{border-top:1px solid var(--line);margin-top:18px;padding-top:16px;display:grid;gap:15px}
+.fragrance-details h3{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#777780;margin:0 0 7px;font-weight:600}
+.fragrance-details p{font-size:12px;line-height:1.7;color:#51515b;margin:0}
+.fragrance-chips{display:flex;flex-wrap:wrap;gap:6px}
+.fragrance-chip{display:inline-flex;padding:5px 9px;border-radius:5px;background:#f4f4f6;color:#5a5a63;font-size:10px;line-height:1.4}
+.list-view .product-scent{grid-column:1;grid-row:2;min-height:0;margin:0;max-width:540px}
+.list-view .product-size{grid-row:3}.list-view .product-meta{grid-row:4}.list-view .product-actions{grid-row:1/5}.list-view .in-order{grid-row:5}
+@media(max-width:950px){.fragrance-filters{width:100%;margin-left:0}}
+@media(max-width:650px){.fragrance-filters{gap:9px;margin-top:9px}.product-scent{font-size:10px;min-height:31px}.fragrance-details{margin-top:12px;padding-top:12px;gap:12px}.fragrance-details p{font-size:11px}.list-view .product-actions{grid-column:1;grid-row:5}.list-view .in-order{grid-column:1;grid-row:6}}
+
 /* Quantity entry stays within the existing stepper; photos remain untouched. */
 .quantity-stepper .quantity-input{flex:1 1 38px;width:38px;min-width:32px;height:100%;padding:0 3px;border:0;border-radius:0;background:transparent;text-align:center;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;line-height:normal;appearance:none}
 .quantity-stepper .quantity-input:focus{background:#fff;outline:2px solid #326387;outline-offset:-2px}

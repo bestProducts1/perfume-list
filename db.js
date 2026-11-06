@@ -5,11 +5,13 @@
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFWYImNbJ0ao5z0VDk_VZwhOP1pnY2UZdFuwxtYOvKaNfEX4sInJh7uk-MlRSH9kffdZ5TjzhudLao/pub?gid=1967485424&single=true&output=csv";
 
+const SHOES_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFWYImNbJ0ao5z0VDk_VZwhOP1pnY2UZdFuwxtYOvKaNfEX4sInJh7uk-MlRSH9kffdZ5TjzhudLao/pub?gid=531106001&single=true&output=csv";
+
 // 缓存时间 (1分钟)
 const CACHE_DURATION = 1 * 60 * 1000;
-const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Catalog_Data_V13";
-const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V13";
-const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V13";
+const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Catalog_Data_V15_Sizes";
+const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V15_Sizes";
+const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V15_Sizes";
 const CATALOG_DISCOUNT_TIERS = window.STOREFRONT_CONFIG.discountTiers;
 const SHIPPING_LABEL = window.STOREFRONT_CONFIG.shippingLabel;
 // GitHub Pages sites share an origin, so each storefront needs its own cart.
@@ -82,18 +84,19 @@ async function fetchLatestProductData() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
-      const response = await fetch(`${SHEET_URL}&_=${Date.now()}`, {
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error("Could not load the latest inventory.");
-      const products = parseCSV(await response.text()).filter(
-        (product) =>
-          String(product.id || "").trim() &&
-          String(product.warehouse || "").trim() &&
-          String(product.name || "").trim() &&
-          (Number(product.price) > 0 || Number(product.coming_soon_weight) > 0),
-      );
+      const readFeed=async(url,shoeFeed=false)=>{
+        const response=await fetch(`${url}&_=${Date.now()}`,{cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw new Error('Could not load the latest inventory.');
+        const text=await response.text();
+        const headers=text.replace(/^\uFEFF/,'').split(/\r?\n/)[0].split(',').map(v=>v.trim().replace(/^"|"$/g,'').toLowerCase());
+        if(shoeFeed&&!['sku','parent_sku','size','stock','price'].every(key=>headers.includes(key)))throw new Error('The shoe inventory data is incomplete.');
+        const rows=parseCSV(text).filter(p=>String(p.id||'').trim()&&String(p.warehouse||'').trim()&&String(p.name||'').trim()&&(Number(p.price)>0||Number(p.coming_soon_weight)>0));
+        if(shoeFeed&&rows.some(p=>!/^([A-Z]+)-XZ-/i.test(p.id)))throw new Error('Unexpected product in the shoe inventory.');
+        return shoeFeed?rows:rows.filter(p=>!/^([A-Z]+)-XZ-/i.test(p.id));
+      };
+      const [fragrances,shoes]=await Promise.all([readFeed(SHEET_URL),readFeed(SHOES_SHEET_URL,true)]);
+      if(!fragrances.length)throw new Error('The inventory data is incomplete.');
+      const products=[...fragrances,...shoes];
       if (!products.length) {
         throw new Error("The inventory data is incomplete. Please try again later.");
       }
@@ -113,6 +116,7 @@ async function fetchLatestProductData() {
       }
       return products;
     } finally {
+      controller.abort();
       clearTimeout(timer);
     }
   })();
@@ -159,27 +163,7 @@ function getCartProduct(item, products = window.perfumeDB) {
   );
 }
 
-function getOrderStockLimit(product) {
-  const rawStock = product?.stock !== "" && product?.stock != null
-    ? product.stock
-    : product?.inventory;
-  const stock = rawStock === "" || rawStock == null ? NaN : Number(rawStock);
-  const price = Number(product?.price);
-  const status = String(product?.stock_status || "").trim().toUpperCase();
-  const unavailable = [
-    "OUT OF STOCK",
-    "MISSING INVENTORY",
-    "UNAVAILABLE",
-    "LOW / HIDDEN",
-  ].includes(status);
-  if (unavailable || !Number.isFinite(price) || price <= 0) return 0;
-  const comingSoonWeight = Number(product?.coming_soon_weight);
-  if (Number.isFinite(comingSoonWeight) && comingSoonWeight > 0 && !(stock >= MIN_ORDER_STOCK)) return 0;
-  if (Number.isFinite(stock)) {
-    return stock >= MIN_ORDER_STOCK ? Math.floor(stock) : 0;
-  }
-  return status === "AVAILABLE" ? Number.MAX_SAFE_INTEGER : 0;
-}
+function getOrderStockLimit(product) {return window.CatalogProductPolicy.stockLimit(product);}
 
 // Pure reconciliation: preserve the chosen warehouse and ask before applying changes.
 function reconcileCart(items, products) {
@@ -218,6 +202,7 @@ function reconcileCart(items, products) {
     }
     updatedItems.push({
       ...item,
+      ...window.CatalogProductPolicy.identity(product),
       name: product.id,
       caption: `${product.id} - ${product.name}`,
       brand: product.brand,
@@ -257,7 +242,7 @@ function buildWhatsAppOrderMessage(items, discountTiers) {
 
   cart.forEach((item) => {
     const quantity = Number(item.quantity) || 0;
-    const unitPrice = Number(item.price) || 0;
+    const unitPrice = Math.round(((Number(item.price) || 0) + Number.EPSILON) * 100) / 100;
     const warehouseCode = String(item.warehouse || "")
       .trim()
       .toUpperCase()
@@ -283,7 +268,7 @@ function buildWhatsAppOrderMessage(items, discountTiers) {
     }
     warehouseGroups.get(groupKey).items.push({
       caption: String(item.caption || item.name || "Product").trim(),
-      size: formatOrderSize(item.ml),
+      size: window.CatalogProductPolicy.spec(item),
       quantity,
       unitPrice,
       lineSubtotal: unitPrice * quantity,
@@ -291,12 +276,10 @@ function buildWhatsAppOrderMessage(items, discountTiers) {
   });
 
   const tiers = Array.isArray(discountTiers) ? discountTiers : [];
-  const tier =
-    tiers.find((item) => totalQty >= item.min && totalQty <= item.max) ||
-    tiers[0] ||
-    { percent: 0 };
-  const discountPercent = Number(tier.percent) || 0;
-  const discountAmount = subtotal * discountPercent;
+  const policySummary=window.CatalogProductPolicy.summary(cart,tiers,window.perfumeDB);
+  subtotal=policySummary.subtotal;
+  const discountPercent = policySummary.discountPercent;
+  const discountAmount = policySummary.discountAmount;
   const shipping = getShippingCost(totalQty);
   const finalTotal = subtotal - discountAmount + shipping;
 
@@ -322,8 +305,11 @@ function buildWhatsAppOrderMessage(items, discountTiers) {
   message += `Other Quantity: ${otherCount}\n`;
   message += `*Total Quantity: ${totalQty} pcs*\n`;
   message += `----------------------------\n`;
+  message += `Discount-eligible perfume quantity: ${policySummary.discountQty} pcs\n`;
+  message += `Full-price items: ${policySummary.fullPriceQty} pcs\n`;
   message += `Subtotal: $${subtotal.toFixed(2)}\n`;
-  message += `Discount (${Math.round(discountPercent * 100)}%): -$${discountAmount.toFixed(2)}\n`;
+  message += `Discount (${formatDiscountPercent(discountPercent)}%): -$${discountAmount.toFixed(2)}\n`;
+  message += `Shoes and gift sets are excluded from volume discounts.\n`;
   message += `Shipping: ${shipping === 0 ? "FREE" : "$" + shipping.toFixed(2)}\n`;
   message += `*Total Amount:* $${finalTotal.toFixed(2)}`;
   return message;

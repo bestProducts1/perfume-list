@@ -17,7 +17,7 @@ export function findOptionPrefix(options,query,start=-1){
 }
 
 export function initSelectMenus(root=document){
-  const definitions=[{id:'warehouse',select:'warehouse-filter',name:'Warehouse',title:'Choose a warehouse'},{id:'price',select:'price-filter',name:'Price',title:'Price range'},{id:'sort',select:'sort-select',name:'Sort',title:'Sort by'}];
+  const definitions=[{id:'warehouse',select:'warehouse-filter',name:'Warehouse',title:'Choose a warehouse'},{id:'price',select:'price-filter',name:'Price',title:'Price range'},{id:'sort',select:'sort-select',name:'Sort',title:'Sort by'},{id:'season',select:'season-filter',name:'Season',title:'Choose a season'},{id:'occasion',select:'occasion-filter',name:'Occasion',title:'Choose an occasion'}];
   for(const definition of definitions){
     const {id,name,title}=definition;
     const select=root.getElementById(definition.select),trigger=root.getElementById(id+'-trigger'),container=root.getElementById(id+'-picker');

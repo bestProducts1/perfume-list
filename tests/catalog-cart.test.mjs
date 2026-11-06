@@ -11,7 +11,7 @@ const isCatalog = root.pathname.endsWith('/catalog/');
 const site = isCatalog ? {
   id: 'catalog', gid: 0, whatsapp: '17253041220', shipping: 'Calculated Separately', freeShipping: false,
   sheet: '2PACX-1vSaFTXofUSG63pjWela7csIA57AcA6rqrhb26_p_NKQ73P8ofYD3Ec4JDqGPVEUv6Fe3HWDpsj8ldaE',
-  cache: 'perfumeDB_BestProducts_Catalog_Data_V14',
+  cache: 'perfumeDB_BestProducts_Catalog_Data_V16_Sizes',
   tiers: [
     { min: 1, max: 10, percent: 0 }, { min: 11, max: 20, percent: .035 },
     { min: 21, max: 40, percent: .08 }, { min: 41, max: Infinity, percent: .12 },
@@ -19,7 +19,7 @@ const site = isCatalog ? {
 } : {
   id: 'perfume-list', gid: 1967485424, whatsapp: '16232027321', shipping: 'FREE', freeShipping: true,
   sheet: '2PACX-1vRFWYImNbJ0ao5z0VDk_VZwhOP1pnY2UZdFuwxtYOvKaNfEX4sInJh7uk-MlRSH9kffdZ5TjzhudLao',
-  cache: 'perfumeDB_BestProducts_Catalog_Data_V13',
+  cache: 'perfumeDB_BestProducts_Catalog_Data_V15_Sizes',
   tiers: [
     { min: 1, max: 1, percent: 0 }, { min: 2, max: 2, percent: .03 },
     { min: 3, max: 4, percent: .05 }, { min: 5, max: 9, percent: .08 },
@@ -37,6 +37,63 @@ const item = (overrides = {}) => ({
   brand: 'Bond No. 9', price: 33, quantity: 1, ml: '100', img: 'photo.webp', ...overrides,
 });
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
+
+test('dual feeds load together, preserve size metadata, and fail closed on partial inventory failure',async()=>{
+  const c=createContext(),s=c.sandbox;
+  s.fetch=async()=>({ok:true,text:async()=>csvFor(product())});
+  s.shoeFeed=async()=>({ok:true,text:async()=> 'sku,parent_sku,brand,name,size,price,stock,image_url\nTX-XZ-04-40,TX-XZ-04,Nike,Air Jordan,40,137,11,shoe.webp'});
+  const rows=await s.fetchLatestProductData();assert.equal(rows.length,2);assert.equal(rows[1].size,'40');assert.equal(s.getOrderStockLimit(rows[1]),11);
+  const saved=JSON.stringify(rows);
+  s.shoeFeed=async()=>({ok:false});await assert.rejects(()=>s.fetchLatestProductData());assert.equal(JSON.stringify(s.perfumeDB),saved);
+  s.shoeFeed=async()=>({ok:true,text:async()=> '<html>Not published</html>'});await assert.rejects(()=>s.fetchLatestProductData());assert.equal(JSON.stringify(s.perfumeDB),saved);
+});
+
+test('all quote surfaces exempt shoes and gift sets, and keep eligible perfume tier quantities',()=>{
+  const c=createContext(),s=c.sandbox;
+  const p=product({price:52}),shoe=product({id:'TX-XZ-04-40',parent_sku:'TX-XZ-04',size:'40',ml:'',name:'Air Jordan',price:137,stock:11}),gift=product({id:'TX-LH-1',name:'Four piece gift set',ml:'30ml*4',price:49});
+  s.perfumeDB=[p,shoe,gift];
+  const make=(p,quantity)=>({...model.productIdentity(p),...item({name:p.id,caption:p.id+' - '+p.name,price:p.price,ml:p.ml,quantity})});
+  const cart=[make(p,2),make(shoe,3),make(gift,4)];c.setCart(cart);s.updateOrderUI();s.renderCart();
+  const expected=model.getOrderSummary(cart,site.tiers,s.perfumeDB);
+  assert.equal(c.element('mobile-order-total').textContent,'$'+expected.totalAmount.toFixed(2));assert.equal(expected.discountQty,2);
+  assert.ok(c.element('cart-body').innerHTML.includes('Full-price shoes / sets (7)'));
+  for(const text of [s.composeOrder(cart),s.buildWhatsAppOrderMessage(cart,site.tiers)]){assert.ok(text.includes('Size 40'));assert.ok(text.includes('$'+expected.totalAmount.toFixed(2)));assert.ok(text.includes('2 pcs'));assert.ok(text.includes('excluded from volume discounts'));}
+  const noDiscount=[make(shoe,9),make(gift,3)];c.setCart(noDiscount);s.updateOrderUI();assert.equal(c.element('mobile-order-savings').hidden,true);
+});
+
+test('shoe details require explicit size choice and keep cart lines separate by variant',()=>{
+  const c=createContext(),s=c.sandbox;
+  const shoe=product({id:'TX-XZ-04-40',parent_sku:'TX-XZ-04',size:'40',ml:'',name:'Air Jordan',price:137,stock:11});
+  const next={...shoe,id:'TX-XZ-04-41',size:'41',stock:48};s.perfumeDB=[shoe,next];
+  s.renderDetail(shoe);assert.match(c.element('product-detail').innerHTML,/Choose a size to add/);assert.match(c.element('product-detail').innerHTML,/choose-shoe-size/);
+  c.evaluate("state.shoeSelected='TX-XZ-04-40::TX'");s.addToOrder(s.cartStockKey(shoe.id,'TX'));
+  c.evaluate("state.shoeSelected='TX-XZ-04-41::TX'");s.addToOrder(s.cartStockKey(next.id,'TX'));
+  assert.deepEqual(c.cart().map(p=>p.name),[shoe.id,next.id]);assert.deepEqual(c.cart().map(p=>p.size),['40','41']);
+  const reconciled=s.reconcileCart(c.cart(),s.perfumeDB);assert.equal(reconciled.changes.length,0);assert.equal(reconciled.items[0].size,'40');
+});
+
+test('shoe navigation clears perfume-only filters and reset restores perfume price options',()=>{
+  const c=createContext(),s=c.sandbox;
+  s.perfumeDB=[product({season:'Spring / Summer',suitable_occasions:'Office'}),product({id:'TX-XZ-04',name:'Air Jordan',brand:'Nike',price:137,ml:'',season:'',suitable_occasions:''})];
+  s.renderHome();c.evaluate("state.filters.season='Spring / Summer';state.filters.occasion='Office';state.filters.priceRange='under30'");
+  s.chooseCategory('Shoes',false);
+  assert.equal(c.element('fragrance-filters').hidden,true);
+  assert.equal(c.evaluate('state.filters.season'),'all');assert.equal(c.evaluate('state.filters.occasion'),'all');
+  assert.equal(c.evaluate('state.filters.priceRange'),'any');
+  assert.match(c.element('products').innerHTML,/TX-XZ-04/);assert.doesNotMatch(c.element('products').innerHTML,/New York Nights/);
+  assert.match(c.element('price-filter').innerHTML,/under150/);
+  s.resetFilters();assert.equal(c.element('fragrance-filters').hidden,false);
+  assert.match(c.element('price-filter').innerHTML,/under30/);assert.doesNotMatch(c.element('price-filter').innerHTML,/under150/);
+});
+
+test('fragrance card escapes sheet text and shoe detail never shows perfume attributes',()=>{
+  const {sandbox:s}=createContext();
+  const p=product({scent_profile:'Citrus <script>alert(1)</script>',season:'All-Season',suitable_occasions:'Office, Date'});
+  assert.match(s.productCard(p),/product-scent/);assert.match(s.productCard(p),/&lt;script&gt;/);assert.doesNotMatch(s.productCard(p),/<script>/);
+  assert.match(s.fragranceDetailHtml(p),/Year-round/);assert.match(s.fragranceDetailHtml(p),/Date Night/);
+  const shoe=product({id:'TX-XZ-04',ml:'',scent_profile:'should not show',season:'All-Season'});
+  assert.equal(s.fragranceDetailHtml(shoe),'');assert.doesNotMatch(s.productCard(shoe),/should not show|product-scent/);
+});
 const storageKeys = {
   cart: `bestProducts1:${site.id}:cart:v1`,
   otherCart: `bestProducts1:${isCatalog ? 'perfume-list' : 'catalog'}:cart:v1`,
@@ -167,6 +224,11 @@ function createContext({ initialStorage = [], sharedStorage, storefrontId = site
     alert: () => { throw new Error('Unexpected native alert'); },
     open: () => { throw new Error('Unexpected unchecked navigation'); },
   };
+  // Legacy perfume scenarios use an explicitly empty, valid second feed. New
+  // dual-feed tests set shoeFeed themselves to exercise real shoe failures/data.
+  let productFetch=sandbox.fetch;
+  sandbox.shoeFeed=async()=>({ok:true,text:async()=> 'sku,parent_sku,name,size,stock,price\n'});
+  Object.defineProperty(sandbox,'fetch',{get:()=>((url,options)=>String(url).includes('gid=531106001')?sandbox.shoeFeed(url,options):productFetch(url,options)),set:fn=>{productFetch=fn;}});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(source('storefront-config.js'), sandbox, { filename: 'storefront-config.js' });
@@ -1615,8 +1677,8 @@ test('SKU handoff helper loads before product data and its receiver cache versio
   const html = source('index.html');
   assert.match(html, /inquiry-sync\.js\?v=20261009-manual-sku-sync/);
   assert.ok(html.indexOf('inquiry-sync.js') < html.indexOf('db.js'));
-  assert.match(html, /app\.mjs\?v=20261009-manual-sku-sync/);
-  assert.match(html, /db\.js\?v=20261009-cart-isolation/);
+  assert.match(html, /app\.mjs\?v=20261106-shoe-sizes/);
+  assert.match(html, /db\.js\?v=20261106-shoe-sizes/);
 });
 
 test('a SKU handoff replaces the scoped order with exact own warehouse products and own quote metadata', () => {

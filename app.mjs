@@ -1,4 +1,6 @@
-import {selectProducts,isComingSoon,formatSize,getOrderSummary,normalizeText,validateOrderQuantity,getWarehouseSummaries} from './catalog-model.mjs?v=20261009-quantity-summary';
+import {selectProducts,isGiftSet,productIdentity,productSpec,orderStockLimit,shoeFamily,groupShoeProducts,isShoe,seasonLabel,productOccasions,isComingSoon,formatSize,getOrderSummary,normalizeText,validateOrderQuantity,getWarehouseSummaries} from './catalog-model.mjs?v=20261106-shoe-sizes';
+
+window.CatalogProductPolicy={summary:getOrderSummary,stockLimit:orderStockLimit,identity:productIdentity,spec:productSpec};
 
 const $ = (id) => document.getElementById(id);
 const cents = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100);
@@ -11,9 +13,9 @@ const tierSchedule = CATALOG_DISCOUNT_TIERS;
 const storefront = window.STOREFRONT_CONFIG;
 const shippingNote = storefront.freeShipping ? 'Free shipping on every order.' : 'Product total excludes shipping.';
 const layoutKey = `bestProducts1${storefront.siteId}LayoutV1`;
-const categoryNames = {All:'All',Men:'Men',Women:'Women',Unisex:'Unisex',GiftSets:'Gift sets',HotSelling:'Best sellers',NewArrival:'New arrivals',ComingSoon:'Coming soon'};
-const defaults = {category:'All',warehouse:'all',brand:'all',priceRange:'any',sort:'popular',query:'',stockOnly:true};
-const state = {filters:{...defaults},view:'grid',limit:24,detailId:null,checking:false,confirm:null,loaded:false};
+const categoryNames = {All:'All',Men:'Men',Women:'Women',Unisex:'Unisex',GiftSets:'Gift sets',HotSelling:'Best sellers',NewArrival:'New arrivals',ComingSoon:'Coming soon',Shoes:'Shoes'};
+const defaults = {category:'All',warehouse:'all',brand:'all',priceRange:'any',sort:'popular',query:'',stockOnly:true,season:'all',occasion:'all'};
+const state = {filters:{...defaults},view:'grid',limit:24,detailId:null,shoeSelected:null,checking:false,confirm:null,loaded:false};
 try {state.view=localStorage.getItem(layoutKey)==='list'?'list':'grid';} catch {}
 let cartEntryHandled=false;
 let skuInquiryEntryHandled=false;
@@ -61,7 +63,7 @@ function readCart(){return window.readStoredCart();}
 function saveCart(cart){window.writeStoredCart(cart);updateOrderUI();}
 function products(){return window.perfumeDB || [];}
 function getProduct(reference){return products().find(p=>stockKey(p)===reference)||products().find(p=>String(p.id)===String(reference));}
-function quantityInCart(product){return readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)===stockKey(product)).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
+function quantityInCart(product){const keys=new Set((product.variants||[product]).map(stockKey));return readCart().filter(item=>keys.has(window.cartStockKey(item.name,item.warehouse))).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function quantityForReference(reference,cart=readCart()){return cart.filter(item=>window.cartStockKey(item.name,item.warehouse)===reference).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function remainingStock(product){return Math.max(0,window.getOrderStockLimit(product)-quantityInCart(product));}
 
@@ -97,7 +99,7 @@ function importPendingSkuInquiry(){
     if(quantity<requested.quantity)notices.push(`${requested.sku} (${requested.warehouse}): ${requested.quantity} requested, ${quantity} added (available stock).`);
     // Import no commercial data from SKU: every quote and product detail belongs
     // to this storefront's own table and its selected warehouse.
-    imported.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
+    imported.push({...productIdentity(product),name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
   }
   const serialized=JSON.stringify(imported);
   let cartWritten=false;
@@ -194,7 +196,10 @@ function imageHtml(product,className=''){
   return `<img class="${className}" src="${esc(product.img)}" alt="${esc(product.name)}" loading="lazy" decoding="async">`;
 }
 
+function withShoeVariants(product){return isShoe(product)?groupShoeProducts([product],products())[0]:product;}
+function selectedDetailProduct(product){return isShoe(product)&&state.shoeSelected?getProduct(state.shoeSelected)||product:product;}
 function productActionsHtml(product){
+  if(isShoe(product))return `<button type="button" class="add-button" data-action="open-product" data-id="${esc(stockKey(product))}">${(product.variants||[product]).some(p=>String(p.size||'').trim())?'Choose size':'Sizes pending'}</button>`;
   if(isComingSoon(product))return `<span class="soon-note">${icon('clock')}Arriving soon</span>`;
   if(quantityInCart(product))return stepper(product);
   return `<button type="button" class="add-button" data-action="add" data-id="${esc(stockKey(product))}" aria-label="Add ${esc(product.name)} to order" ${remainingStock(product)<=0||state.checking?'disabled':''}>${state.view==='list'?icon('shopping-cart'):'Add'}</button>`;
@@ -212,11 +217,12 @@ function updateProductCards(){
   const focus=captureFocus(root);
   const byKey=new Map(products().map(product=>[stockKey(product),product]));
   root.querySelectorAll('.product-card').forEach(card=>{
-    const product=byKey.get(card.dataset.stockKey);if(!product)return;
+    const raw=byKey.get(card.dataset.stockKey);if(!raw)return;const product=withShoeVariants(raw);
     const actions=card.querySelector('.product-actions');
     const added=quantityInCart(product);
     const soon=isComingSoon(product);
     // Keep photos, titles and existing quantity buttons mounted during cart updates.
+    if(isShoe(product)){card.querySelector('.in-order').textContent=added?`${added} in your order`:'';return;}
     const matches=soon?actions.querySelector('.soon-note'):added||hasActiveQuantityDraft(actions)?actions.querySelector('.quantity-stepper'):actions.querySelector('[data-action="add"]');
     if(!matches)actions.innerHTML=productActionsHtml(product);
     const quantity=actions.querySelector('.quantity-stepper');
@@ -228,24 +234,37 @@ function updateProductCards(){
   restoreFocus(root,focus);
 }
 
+function scentCardHtml(product){
+  const profile=String(product.scent_profile||'').trim();
+  return !isShoe(product)&&profile?`<p class="product-scent" title="${esc(profile)}">${esc(profile)}</p>`:'';
+}
+function fragranceDetailHtml(product){
+  if(isShoe(product))return '';
+  const profile=String(product.scent_profile||'').trim(),season=seasonLabel(product.season),occasions=productOccasions(product);
+  if(!profile&&!season&&!occasions.length)return '';
+  return `<section class="fragrance-details" aria-label="Fragrance profile">${profile?`<div><h3>Scent profile</h3><p>${esc(profile)}</p></div>`:''}${season?`<div><h3>Season</h3><span class="fragrance-chip">${esc(season)}</span></div>`:''}${occasions.length?`<div><h3>Occasions</h3><div class="fragrance-chips">${occasions.map(value=>`<span class="fragrance-chip">${esc(value)}</span>`).join('')}</div></div>`:''}</section>`;
+}
 function productCard(product){
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
   let label=soon?'Coming soon':Number(product.new_arrival_weight)>0?'New arrival':Number(product.hot_selling_weight)>0?'Best seller':'';
-  return `<article class="product-card" data-product-id="${esc(product.id)}" data-stock-key="${esc(stockKey(product))}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button><p class="product-size">${esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${productActionsHtml(product)}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
+  return `<article class="product-card" data-product-id="${esc(product.id)}" data-stock-key="${esc(stockKey(product))}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button>${scentCardHtml(product)}<p class="product-size">${isShoe(product)?'Shoes':esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(isShoe(product)?product.parent_sku||product.id:product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${productActionsHtml(product)}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
 }
 
 function renderProducts(){
   if(!state.loaded)return;
   document.body.classList.toggle('catalog-list-view',state.view==='list');
   const focus=captureFocus($('products'));
-  const all=selectProducts(products(),state.filters);
+  const all=groupShoeProducts(selectProducts(products(),state.filters),products());
   const visible=all.slice(0,state.limit);
   $('products').className=`product-grid${state.view==='list'?' list-view':''}`;
   $('products').setAttribute('aria-busy','false');
-  $('products').innerHTML=visible.length?visible.map(productCard).join(''):`<div class="empty-state">${icon('search')}<h3>No fragrances found</h3><p>Try another brand, warehouse or search.</p><button class="secondary-button" type="button" data-action="reset-filters">Clear filters</button></div>`;
-  $('results-count').textContent=`${all.length} fragrances`;
-  $('showing-count').textContent=all.length?`Showing ${visible.length} of ${all.length} fragrances`:'';
+  $('products').innerHTML=visible.length?visible.map(productCard).join(''):`<div class="empty-state">${icon('search')}<h3>No products found</h3><p>Try another brand, warehouse or search.</p><button class="secondary-button" type="button" data-action="reset-filters">Clear filters</button></div>`;
+  const noun=state.filters.category==='Shoes'?'shoes':'products';
+  $('collection-title').textContent=state.filters.category==='Shoes'?'Find your next pair':'Find your next favorite';
+  $('fragrance-filters').hidden=state.filters.category==='Shoes';
+  $('results-count').textContent=`${all.length} ${noun}`;
+  $('showing-count').textContent=all.length?`Showing ${visible.length} of ${all.length} ${noun}`:'';
   $('load-more').hidden=visible.length>=all.length;
   $('clear-search').hidden=!state.filters.query;
   document.querySelectorAll('[data-view]').forEach(el=>{const active=el.dataset.view===state.view;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active));});
@@ -255,6 +274,8 @@ function renderProducts(){
   if(state.filters.warehouse!=='all')active.push(`${state.filters.warehouse} Warehouse`);
   if(state.filters.brand!=='all')active.push(state.filters.brand);
   if(state.filters.priceRange!=='any')active.push($('price-filter').selectedOptions[0].textContent);
+  if(state.filters.season!=='all')active.push(state.filters.season);
+  if(state.filters.occasion!=='all')active.push(state.filters.occasion);
   if(state.filters.query)active.push(`“${state.filters.query}”`);
   $('active-filters').hidden=!active.length;
   $('active-filter-text').textContent=active.join(' · ');
@@ -268,11 +289,21 @@ function populateFilters(){
   $('warehouse-filter').value=warehouses.includes(state.filters.warehouse)?state.filters.warehouse:'all';
   state.filters.warehouse=$('warehouse-filter').value;
   populateBrands();
+  populateFragranceFilters();
   $('hero-count').textContent=`${products().length}+`;
 }
 
+function populateFragranceFilters(){
+  const seasons=['Spring / Summer','Fall / Winter','Year-round'];
+  const occasions=[...new Set(products().filter(p=>!isShoe(p)).flatMap(productOccasions))].sort((a,b)=>a.localeCompare(b));
+  for(const [id,values] of [['season',seasons],['occasion',occasions]]){
+    $(id+'-filter').innerHTML=`<option value="all">All ${id==='season'?'seasons':'occasions'}</option>`+values.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('');
+    if(!values.includes(state.filters[id]))state.filters[id]='all';
+    $(id+'-filter').value=state.filters[id];
+  }
+}
 function populateBrands(){
-  const all=selectProducts(products(),{...defaults,warehouse:state.filters.warehouse,stockOnly:false});
+  const all=selectProducts(products(),{...defaults,category:state.filters.category==='Shoes'?'Shoes':'All',warehouse:state.filters.warehouse,stockOnly:false});
   const brandNames=new Map();
   all.forEach(product=>{const name=String(product.brand||'').trim();const key=normalizeText(name);if(key&&!brandNames.has(key))brandNames.set(key,name);});
   const brands=[...brandNames.values()].sort((a,b)=>a.localeCompare(b,'en',{sensitivity:'base'}));
@@ -297,13 +328,22 @@ function showLoadError(){
 function resetFilters(){
   state.filters={...defaults};state.limit=24;
   $('search-input').value='';$('warehouse-filter').value='all';$('price-filter').value='any';$('sort-select').value='popular';$('stock-filter').checked=true;
-  populateBrands();renderProducts();
+  populateBrands();populateFragranceFilters();renderProducts();
+  chooseCategory('All',false);
   document.dispatchEvent(new Event('catalog-filters-sync'));
 }
 
 function chooseCategory(category,scroll=true){
   if(!categoryNames[category])return;
+  const switchType=(state.filters.category==='Shoes')!==(category==='Shoes');
   state.filters.category=category;state.limit=24;
+  if(switchType){state.filters.brand='all';state.filters.priceRange='any';$('price-filter').value='any';}
+  if(category==='Shoes'){state.filters.season='all';state.filters.occasion='all';}
+  const priceOptions=category==='Shoes'?[['any','Any price'],['under150','Under $150'],['150to200','$150–$200'],['over200','Over $200']]:[['any','Any price'],['under30','Under $30'],['30to40','$30–$40'],['over40','Over $40']];
+  $('price-filter').innerHTML=priceOptions.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
+  $('price-filter').value=state.filters.priceRange;
+  populateBrands();populateFragranceFilters();
+  document.dispatchEvent(new Event('catalog-filters-sync'));
   state.filters.stockOnly=category!=='ComingSoon';$('stock-filter').checked=state.filters.stockOnly;
   if($('menu-dialog').open)$('menu-dialog').close();
   renderProducts();
@@ -341,7 +381,7 @@ function setProductQuantity(reference,value){
   if(quantity===0){
     if(!existing)return true;
     const snapshot=JSON.stringify(cart.filter(matches));
-    confirmAction('Remove this fragrance?',`${existing.name} will be removed from your order.`, 'Remove item',()=>{
+    confirmAction('Remove this product?',`${existing.name} will be removed from your order.`, 'Remove item',()=>{
       if(state.checking){showToast('Please wait while your order is being checked.');return;}
       const latest=readCart();
       if(JSON.stringify(latest.filter(matches))!==snapshot){showToast('This item changed in another window. Review its quantity before removing it.');updateOrderUI();return;}
@@ -350,12 +390,12 @@ function setProductQuantity(reference,value){
     });
     return true;
   }
-  if(!product||isComingSoon(product)){showToast('This fragrance is not available to order yet.');return false;}
+  if(!product||isComingSoon(product)){showToast('This product is not available to order yet.');return false;}
   // Preserve the latest saved commercial data. Editing a total is not approval
   // to replace its price, size or selected warehouse with the current feed.
   const next=cart.filter(item=>!matches(item)||item===existing);
   if(existing)existing.quantity=quantity;
-  else next.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
+  else next.push({...productIdentity(product),name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
   saveCart(next);setValidation('');
   showQuantityFeedback(product,quantity-current,quantity,{direct:true});
   return true;
@@ -401,23 +441,23 @@ function commitQuantityInput(input,{blur=false}={}){
 function addToOrder(id){
   if(state.checking)return;
   const product=getProduct(id);if(!product)return;
-  if(isComingSoon(product)){showToast('This fragrance is arriving soon.');return;}
+  if(isComingSoon(product)){showToast('This product is arriving soon.');return;}
   if(quantityInCart(product)>0)return;
   if(!remainingStock(product)){showToast('Please check the available stock in this warehouse.');return;}
   const cart=readCart();const key=stockKey(product);const existing=cart.find(item=>window.cartStockKey(item.name,item.warehouse)===key);
   if(existing)return;
-  cart.push({name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity:1});
+  cart.push({...productIdentity(product),name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity:1});
   saveCart(cart);showQuantityFeedback(product,1,1);
 }
 
 function updateOrderUI(){
-  const summary=getOrderSummary(readCart(),tierSchedule);
+  const summary=getOrderSummary(readCart(),tierSchedule,products());
   $('cart-count').textContent=summary.qty;$('cart-count').hidden=!summary.qty;
   $('mobile-order-bar').hidden=!summary.qty;
   $('mobile-order-total').textContent=money(summary.totalAmount);
   $('mobile-order-quantity').textContent=`${summary.qty} ${summary.qty===1?'item':'items'} · ${storefront.freeShipping?'free shipping':'excl. shipping'}`;
   $('mobile-order-savings').hidden=summary.discountPercent<=0;
-  $('mobile-order-savings').textContent=summary.discountPercent>0?`${window.formatDiscountPercent(summary.discountPercent)}% off · Saved ${money(summary.discountAmount)}`:'';
+  $('mobile-order-savings').textContent=summary.discountPercent>0?`${window.formatDiscountPercent(summary.discountPercent)}% off${summary.fullPriceQty?' eligible perfumes':''} · Saved ${money(summary.discountAmount)}`:'';
   document.body.classList.toggle('has-order',summary.qty>0);
   updateProductCards();
   if($('cart-dialog').open)renderCart();
@@ -425,12 +465,17 @@ function updateOrderUI(){
 }
 
 function detailOrderActionsHtml(product){
+  if(isShoe(product)&&!state.shoeSelected){
+    const sizes=withShoeVariants(product).variants.some(p=>String(p.size||'').trim());
+    return `<button type="button" class="primary-button detail-add" disabled>${isComingSoon(product)?'Arriving soon':sizes?'Choose a size to add':'Sizes pending'}</button><p class="detail-note">Shoes are full price. ${sizes?'Select an available size above.':'Ordering will open when sizes are confirmed.'}</p>`;
+  }
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
-  return `${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`Volume discounts apply at checkout. Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}`;
+  return `${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`${isShoe(product)||isGiftSet(product)?'Full price · No volume discount.':'Volume discounts apply to eligible perfumes only.'} Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}`;
 }
 
 function updateDetailOrderActions(product){
+  product=selectedDetailProduct(product);
   const root=$('product-detail');
   const actions=root.querySelector('.detail-order-actions');
   if(!actions){renderDetail(product);return;}
@@ -458,12 +503,18 @@ function detailGenderHtml(product){
   return `<span class="detail-gender" aria-label="For ${label}">${icon(symbol)}${label}</span>`;
 }
 
+function shoeSizesHtml(product){
+  if(!isShoe(product))return '';
+  const variants=withShoeVariants(product).variants.filter(p=>String(p.size||'').trim());
+  return `<section class="shoe-sizes" aria-label="Choose shoe size"><div class="shoe-size-heading"><h3>Choose size</h3><span>Supplier sizing</span></div>${variants.length?`<div class="shoe-size-options">${variants.map(p=>`<button type="button" class="shoe-size-button" data-action="choose-shoe-size" data-id="${esc(stockKey(p))}" aria-pressed="${state.shoeSelected===stockKey(p)}" aria-label="Size ${esc(p.size)} · ${Number(p.stock)||0} in stock" ${orderStockLimit(p)<=0?'disabled':''}>${esc(p.size)}<small>${orderStockLimit(p)>0?Number(p.stock)+' available':'Sold out'}</small></button>`).join('')}</div>`:'<p class="size-pending">Size details are being updated. Ordering will be available once sizes are confirmed.</p>'}</section>`;
+}
 function renderDetail(product,{resetScroll=false}={}){
+  product=selectedDetailProduct(product);
   const focus=captureFocus($('product-detail'));
   const scrollTop=resetScroll?0:($('product-detail').querySelector('.detail-body')?.scrollTop||0);
   const soon=isComingSoon(product);
   const warehouse=normalizeWarehouse(product.warehouse);
-  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${esc(formatSize(product.ml))}${detailGenderHtml(product)}</p><span class="sku">${esc(product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span></div></div><div class="detail-order-actions">${detailOrderActionsHtml(product)}</div></div>`;
+  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${isShoe(product)?(state.shoeSelected?esc(productSpec(product)):'Select your size'):esc(formatSize(product.ml))+detailGenderHtml(product)}</p><span class="sku">${esc(isShoe(product)&&!state.shoeSelected?product.parent_sku||product.id:product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span>${fragranceDetailHtml(product)}${shoeSizesHtml(product)}</div></div><div class="detail-order-actions">${detailOrderActionsHtml(product)}</div></div>`;
   const body=$('product-detail').querySelector('.detail-body');
   if(body)body.scrollTop=scrollTop;
   restoreFocus($('product-detail'),focus);
@@ -480,7 +531,7 @@ function closeDialog(dialog){dialog.close();}
 
 function openProduct(id){
   const product=getProduct(id);if(!product)return;
-  state.detailId=stockKey(product);renderDetail(product,{resetScroll:true});$('product-dialog').scrollTop=0;openDialog($('product-dialog'));
+  state.shoeSelected=null;state.detailId=stockKey(product);renderDetail(product,{resetScroll:true});$('product-dialog').scrollTop=0;openDialog($('product-dialog'));
 }
 
 function cartLine(item,index){
@@ -489,7 +540,7 @@ function cartLine(item,index){
   const max=window.getOrderStockLimit(product);
   const title=String(item.caption||item.name).replace(new RegExp(`^${String(item.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*-\\s*`),'');
   const reference=window.cartStockKey(item.name,item.warehouse);
-  return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(formatSize(item.ml))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(reference)}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(reference,title,quantityForReference(reference))}<button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
+  return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(productSpec(item))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(reference)}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(reference,title,quantityForReference(reference))}<button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
 }
 
 function warehouseSummaryText(summary){return `${summary.qty} ${summary.qty===1?'pc':'pcs'} · ${money(summary.subtotal)} before discount`;}
@@ -504,13 +555,13 @@ function updateWarehouseHeadings(cart){
 
 function cartSummaryHtml(summary){
   const percent=window.formatDiscountPercent(summary.discountPercent);
-  const next=tierSchedule.find(tier=>tier.min>summary.qty);
-  return `<h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div><div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.qty} more ${next.min-summary.qty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off your entire order.`:'Your maximum volume discount is applied.'}<br>${shippingNote}</div>`;
+  const next=tierSchedule.find(tier=>tier.min>summary.discountQty);
+  return `<h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div>${summary.fullPriceQty?`<div class="summary-line"><span>Eligible perfumes (${summary.discountQty})</span><span>${money(summary.discountSubtotal)}</span></div><div class="summary-line"><span>Full-price shoes / sets (${summary.fullPriceQty})</span><span>${money(summary.fullPriceSubtotal)}</span></div>`:''}<div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.discountQty} more ${next.min-summary.discountQty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off eligible perfumes.`:'Your maximum eligible perfume discount is applied.'}<br>Shoes and gift sets stay full price and do not count toward discount tiers.<br>${shippingNote}</div>`;
 }
 
 function renderCart(){
   const focus=captureFocus($('cart-body'));
-  const cart=readCart();const summary=getOrderSummary(cart,tierSchedule);
+  const cart=readCart();const summary=getOrderSummary(cart,tierSchedule,products());
   $('drawer-cart-count').textContent=`(${summary.qty})`;
   $('cart-actions').hidden=!cart.length;
   $('checkout-button').disabled=state.checking||!cart.length;
@@ -562,13 +613,13 @@ function confirmAction(title,message,label,action){
 }
 
 function composeOrder(cart){
-  const summary=getOrderSummary(cart,tierSchedule);
+  const summary=getOrderSummary(cart,tierSchedule,products());
   const groups=new Map();cart.forEach(item=>{const label=`${normalizeWarehouse(item.warehouse)} Warehouse`;if(!groups.has(label))groups.set(label,[]);groups.get(label).push(item);});
   let text='*New Order Request* 📦\n----------------------------\n';
   groups.forEach((items,warehouse)=>{
     text+=`*${warehouse}*\n`;
     items.forEach(item=>{
-      const size=formatSize(item.ml);
+      const size=productSpec(item);
       const caption=String(item.caption||item.name);
       const prefix=`${item.name} - `;
       const title=caption.startsWith(prefix)?caption.slice(prefix.length):caption===item.name?'':caption;
@@ -578,7 +629,7 @@ function composeOrder(cart){
     });
     text+='\n';
   });
-  text+=`----------------------------\nLV Quantity: ${summary.lvQty}\nOther Quantity: ${summary.otherQty}\n*Total Quantity: ${summary.qty} pcs*\n----------------------------\nSubtotal: ${money(summary.subtotal)}\nDiscount (${window.formatDiscountPercent(summary.discountPercent)}%): -${money(summary.discountAmount)}\nShipping: ${storefront.shippingLabel}\n*${storefront.freeShipping?'Total Amount':'Total Amount (excl. shipping)'}:* ${money(summary.totalAmount)}`;
+  text+=`----------------------------\nLV Quantity: ${summary.lvQty}\nOther Quantity: ${summary.otherQty}\n*Total Quantity: ${summary.qty} pcs*\n----------------------------\nDiscount-eligible perfumes: ${summary.discountQty} pcs\nFull-price shoes / sets: ${summary.fullPriceQty} pcs\nSubtotal: ${money(summary.subtotal)}\nDiscount (${window.formatDiscountPercent(summary.discountPercent)}%): -${money(summary.discountAmount)}\nShoes and gift sets are excluded from volume discounts.\nShipping: ${storefront.shippingLabel}\n*${storefront.freeShipping?'Total Amount':'Total Amount (excl. shipping)'}:* ${money(summary.totalAmount)}`;
   return text;
 }
 
@@ -628,6 +679,11 @@ document.addEventListener('click',(event)=>{
     case 'retry-data':$('products').innerHTML='<div class="loading-state"><span class="loader"></span><p>Loading the collection…</p></div>';loadTimer=setTimeout(showLoadError,14000);window.initProductData();break;
     case 'load-more':state.limit+=24;renderProducts();break;
     case 'open-product':openProduct(id);break;
+    case 'choose-shoe-size':{
+      const base=getProduct(state.detailId),variant=getProduct(id);
+      if(!base||!variant||shoeFamily(base)!==shoeFamily(variant)||orderStockLimit(variant)<=0||state.checking)break;
+      state.shoeSelected=stockKey(variant);renderDetail(base);break;
+    }
     case 'close-product':closeDialog($('product-dialog'));break;
     case 'product-minus':updateProductQuantity(id,-1);break;
     case 'product-plus':updateProductQuantity(id,1);break;
@@ -636,7 +692,7 @@ document.addEventListener('click',(event)=>{
     case 'close-cart':closeDialog($('cart-dialog'));break;
     case 'cart-minus':updateCartQuantity(index,-1);break;
     case 'cart-plus':updateCartQuantity(index,1);break;
-    case 'remove-line':{if(state.checking)break;const item=readCart()[index];if(!item)break;const key=window.cartStockKey(item.name,item.warehouse);confirmAction('Remove this fragrance?','It will be removed from your order.','Remove item',()=>{saveCart(readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)!==key));});break;}
+    case 'remove-line':{if(state.checking)break;const item=readCart()[index];if(!item)break;const key=window.cartStockKey(item.name,item.warehouse);confirmAction('Remove this product?','It will be removed from your order.','Remove item',()=>{saveCart(readCart().filter(item=>window.cartStockKey(item.name,item.warehouse)!==key));});break;}
     case 'clear-cart':if(!state.checking)confirmAction('Clear your order?','All items will be removed. You can start a new order any time.','Clear order',()=>{saveCart([]);setValidation('');});break;
     case 'checkout':checkout();break;
   }
@@ -668,7 +724,7 @@ document.addEventListener('keydown',event=>{
 });
 
 $('search-input').addEventListener('input',(event)=>{clearTimeout(queryTimer);state.filters.query=event.target.value;state.limit=24;queryTimer=setTimeout(renderProducts,120);});
-for(const [id,field] of [['warehouse-filter','warehouse'],['brand-filter','brand'],['price-filter','priceRange'],['sort-select','sort']]){
+for(const [id,field] of [['warehouse-filter','warehouse'],['brand-filter','brand'],['price-filter','priceRange'],['sort-select','sort'],['season-filter','season'],['occasion-filter','occasion']]){
   $(id).addEventListener('change',(event)=>{state.filters[field]=event.target.value;state.limit=24;if(field==='warehouse')populateBrands();renderProducts();});
 }
 $('stock-filter').addEventListener('change',(event)=>{state.filters.stockOnly=event.target.checked;if(event.target.checked&&state.filters.category==='ComingSoon')state.filters.category='All';state.limit=24;renderProducts();});
