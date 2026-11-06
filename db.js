@@ -96,14 +96,17 @@ async function fetchLatestProductData() {
         if(shoeFeed&&rows.some(p=>!/^([A-Z]+)-XZ-/i.test(p.id)))throw new Error('Unexpected product in the shoe inventory.');
         return shoeFeed?rows:rows.filter(p=>!/^([A-Z]+)-XZ-/i.test(p.id));
       };
-      const [fragrances,shoes]=await Promise.all([readFeed(SHEET_URL),readFeed(SHOES_SHEET_URL,true)]);
+      const readCombos=async()=>{
+        const response=await fetch(`${COMBOS_SHEET_URL}&_=${Date.now()}`,{cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw Error('Could not load the latest combos.');
+        const text=await response.text();
+        const headers=text.replace(/^\uFEFF/,'').split(/\r?\n/)[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+        if(!['sku','name','items','price_catalog','price_perfume_list','image_url'].every(h=>headers.includes(h)))throw Error('The combo data is incomplete.');
+        return parseCSV(text);
+      };
+      const [fragrances,shoes,comboRows]=await Promise.all([readFeed(SHEET_URL),readFeed(SHOES_SHEET_URL,true),readCombos()]);
       if(!fragrances.length)throw new Error('The inventory data is incomplete.');
-      const comboResponse=await fetch(`${COMBOS_SHEET_URL}&_=${Date.now()}`,{cache:'no-store',signal:controller.signal});
-      if(!comboResponse.ok)throw Error('Could not load the latest combos.');
-      const comboText=await comboResponse.text();
-      const comboHeaders=comboText.replace(/^\uFEFF/,'').split(/\r?\n/)[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
-      if(!['sku','name','items','price_catalog','price_perfume_list','image_url'].every(h=>comboHeaders.includes(h)))throw Error('The combo data is incomplete.');
-      const combos=window.CatalogProductPolicy.combos(parseCSV(comboText),fragrances,window.STOREFRONT_CONFIG.siteId);
+      const combos=window.CatalogProductPolicy.combos(comboRows,fragrances,window.STOREFRONT_CONFIG.siteId);
       const products=[...fragrances,...shoes,...combos];
       if (!products.length) {
         throw new Error("The inventory data is incomplete. Please try again later.");

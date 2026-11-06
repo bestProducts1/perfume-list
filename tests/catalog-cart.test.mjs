@@ -41,6 +41,13 @@ const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.wareh
 const comboRow={sku:'TX-CB-001',name:'Two Fragrance Combo',items:'TX-A055*2+TX-A056*1',price_catalog:'80',price_perfume_list:'100',image_url:''};
 const comboFixture=s=>{const parts=[product({stock:19}),product({id:'TX-A056',stock:40})];const combo=model.buildComboProducts([comboRow],parts,site.id)[0];s.perfumeDB=[...parts,combo];return {parts,combo,make:(p,q)=>({...model.productIdentity(p),...item({name:p.id,caption:p.id+' - '+p.name,price:p.price,ml:p.ml||'',quantity:q})})};};
 
+test('all three inventory requests start together before any feed completes',async()=>{
+ const c=createContext(),s=c.sandbox,started=[],releases=[];
+ const fetcher=body=>url=>new Promise(resolve=>{started.push(url);releases.push(()=>resolve({ok:true,text:async()=>body}));});
+ s.fetch=fetcher(csvFor(product()));s.shoeFeed=fetcher('sku,parent_sku,name,size,stock,price\n');s.comboFeed=fetcher('sku,name,items,price_catalog,price_perfume_list,image_url\n');
+ const pending=s.fetchLatestProductData();assert.equal(started.length,3);for(const release of releases)release();await pending;
+});
+
 test('combo feed materializes own prices and a failed combo refresh never replaces the complete inventory',async()=>{
  const c=createContext(),s=c.sandbox;
  s.fetch=async()=>({ok:true,text:async()=>csvFor(product({stock:19}))+'\nTX-A056,TX,Second,40,33,100,Creed'});
@@ -1719,7 +1726,7 @@ test('SKU handoff helper loads before product data and its receiver cache versio
   assert.match(html, /inquiry-sync\.js\?v=20261009-manual-sku-sync/);
   assert.ok(html.indexOf('inquiry-sync.js') < html.indexOf('db.js'));
   assert.match(html, /app\.mjs\?v=20261106-combos/);
-  assert.match(html, /db\.js\?v=20261106-combos/);
+  assert.match(html, /db\.js\?v=20261106-combos-feeds/);
 });
 
 test('a SKU handoff replaces the scoped order with exact own warehouse products and own quote metadata', () => {
