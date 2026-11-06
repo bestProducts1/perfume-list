@@ -1,6 +1,6 @@
-import {selectProducts,isGiftSet,productIdentity,productSpec,orderStockLimit,shoeFamily,groupShoeProducts,isShoe,seasonLabel,productOccasions,isComingSoon,formatSize,getOrderSummary,normalizeText,validateOrderQuantity,getWarehouseSummaries} from './catalog-model.mjs?v=20261106-shoe-sizes';
+import {isCombo,buildComboProducts,cartProductLimit,selectProducts,isGiftSet,productIdentity,productSpec,orderStockLimit,shoeFamily,groupShoeProducts,isShoe,seasonLabel,productOccasions,isComingSoon,formatSize,getOrderSummary,normalizeText,validateOrderQuantity,getWarehouseSummaries} from './catalog-model.mjs?v=20261106-combos';
 
-window.CatalogProductPolicy={summary:getOrderSummary,stockLimit:orderStockLimit,identity:productIdentity,spec:productSpec};
+window.CatalogProductPolicy={isCombo,combos:buildComboProducts,cartLimit:cartProductLimit,summary:getOrderSummary,stockLimit:orderStockLimit,identity:productIdentity,spec:productSpec};
 
 const $ = (id) => document.getElementById(id);
 const cents = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100);
@@ -13,7 +13,7 @@ const tierSchedule = CATALOG_DISCOUNT_TIERS;
 const storefront = window.STOREFRONT_CONFIG;
 const shippingNote = storefront.freeShipping ? 'Free shipping on every order.' : 'Product total excludes shipping.';
 const layoutKey = `bestProducts1${storefront.siteId}LayoutV1`;
-const categoryNames = {All:'All',Men:'Men',Women:'Women',Unisex:'Unisex',GiftSets:'Gift sets',HotSelling:'Best sellers',NewArrival:'New arrivals',ComingSoon:'Coming soon',Shoes:'Shoes'};
+const categoryNames = {All:'All',Men:'Men',Women:'Women',Unisex:'Unisex',GiftSets:'Gift sets',HotSelling:'Best sellers',NewArrival:'New arrivals',ComingSoon:'Coming soon',Shoes:'Shoes',Combo:'Combo'};
 const defaults = {category:'All',warehouse:'all',brand:'all',priceRange:'any',sort:'popular',query:'',stockOnly:true,season:'all',occasion:'all'};
 const state = {filters:{...defaults},view:'grid',limit:24,detailId:null,shoeSelected:null,checking:false,confirm:null,loaded:false};
 try {state.view=localStorage.getItem(layoutKey)==='list'?'list':'grid';} catch {}
@@ -65,7 +65,7 @@ function products(){return window.perfumeDB || [];}
 function getProduct(reference){return products().find(p=>stockKey(p)===reference)||products().find(p=>String(p.id)===String(reference));}
 function quantityInCart(product){const keys=new Set((product.variants||[product]).map(stockKey));return readCart().filter(item=>keys.has(window.cartStockKey(item.name,item.warehouse))).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
 function quantityForReference(reference,cart=readCart()){return cart.filter(item=>window.cartStockKey(item.name,item.warehouse)===reference).reduce((sum,item)=>sum+(Number(item.quantity)||0),0);}
-function remainingStock(product){return Math.max(0,window.getOrderStockLimit(product)-quantityInCart(product));}
+function remainingStock(product){return Math.max(0,cartProductLimit(product,readCart(),products())-quantityInCart(product));}
 
 function importPendingSkuInquiry(){
   // SKU hands off quantities or an explicit clear once per page load. Renders and storage
@@ -93,7 +93,7 @@ function importPendingSkuInquiry(){
     if(!product){notices.push(`${requested.sku} (${requested.warehouse}): not listed in this warehouse.`);continue;}
     if(isComingSoon(product)){notices.push(`${requested.sku} (${requested.warehouse}): arriving soon, not added.`);continue;}
     if(!Number.isFinite(Number(product.price))||Number(product.price)<=0){notices.push(`${requested.sku} (${requested.warehouse}): price pending, not added.`);continue;}
-    const limit=window.getOrderStockLimit(product);
+    const limit=cartProductLimit(product,readCart(),products());
     if(limit<=0){notices.push(`${requested.sku} (${requested.warehouse}): unavailable, not added.`);continue;}
     const quantity=Math.min(requested.quantity,limit);
     if(quantity<requested.quantity)notices.push(`${requested.sku} (${requested.warehouse}): ${requested.quantity} requested, ${quantity} added (available stock).`);
@@ -101,6 +101,8 @@ function importPendingSkuInquiry(){
     // to this storefront's own table and its selected warehouse.
     imported.push({...productIdentity(product),name:product.id,caption:`${product.id} - ${product.name}`,warehouse:product.warehouse,brand:product.brand,price:Number(product.price),ml:String(product.ml||''),img:product.img,quantity});
   }
+  const reconciled=window.reconcileCart(imported,products());
+  imported.splice(0,imported.length,...reconciled.items);notices.push(...reconciled.changes);
   const serialized=JSON.stringify(imported);
   let cartWritten=false;
   try{
@@ -176,7 +178,7 @@ function quantityInputHtml(reference,label,amount){
 
 function stepper(product){
   const amount=quantityInCart(product);
-  return `<div class="quantity-stepper" data-stock-key="${esc(stockKey(product))}" aria-label="Order quantity for ${esc(product.name)}"><button type="button" data-action="product-minus" data-id="${esc(stockKey(product))}" aria-label="Decrease ${esc(product.name)} quantity in your order" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(stockKey(product),product.name,amount)}<button type="button" data-action="product-plus" data-id="${esc(stockKey(product))}" aria-label="Increase ${esc(product.name)} quantity in your order" ${state.checking||amount>=window.getOrderStockLimit(product)?'disabled':''}>+</button></div>`;
+  return `<div class="quantity-stepper" data-stock-key="${esc(stockKey(product))}" aria-label="Order quantity for ${esc(product.name)}"><button type="button" data-action="product-minus" data-id="${esc(stockKey(product))}" aria-label="Decrease ${esc(product.name)} quantity in your order" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(stockKey(product),product.name,amount)}<button type="button" data-action="product-plus" data-id="${esc(stockKey(product))}" aria-label="Increase ${esc(product.name)} quantity in your order" ${state.checking||amount>=cartProductLimit(product,readCart(),products())?'disabled':''}>+</button></div>`;
 }
 
 function hasActiveQuantityDraft(root){
@@ -192,6 +194,7 @@ function syncQuantityInput(input,amount){
 }
 
 function imageHtml(product,className=''){
+  if(isCombo(product)&&!product.img)return `<span class="combo-mosaic">${(product.components||[]).slice(0,4).map(p=>p.img?`<img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" decoding="async">`:'').join('')}</span>`;
   if(!product.img) return `<span class="missing-image">Product photo unavailable</span>`;
   return `<img class="${className}" src="${esc(product.img)}" alt="${esc(product.name)}" loading="lazy" decoding="async">`;
 }
@@ -209,7 +212,7 @@ function syncQuantityStepper(element,product){
   const amount=quantityInCart(product);
   syncQuantityInput(element.querySelector('.quantity-input'),amount);
   element.querySelector('[data-action="product-minus"]').disabled=state.checking;
-  element.querySelector('[data-action="product-plus"]').disabled=state.checking||amount>=window.getOrderStockLimit(product);
+  element.querySelector('[data-action="product-plus"]').disabled=state.checking||amount>=cartProductLimit(product,readCart(),products());
 }
 
 function updateProductCards(){
@@ -239,7 +242,7 @@ function scentCardHtml(product){
   return !isShoe(product)&&profile?`<p class="product-scent" title="${esc(profile)}">${esc(profile)}</p>`:'';
 }
 function fragranceDetailHtml(product){
-  if(isShoe(product))return '';
+  if(isShoe(product)||isCombo(product))return '';
   const profile=String(product.scent_profile||'').trim(),season=seasonLabel(product.season),occasions=productOccasions(product);
   if(!profile&&!season&&!occasions.length)return '';
   return `<section class="fragrance-details" aria-label="Fragrance profile">${profile?`<div><h3>Scent profile</h3><p>${esc(profile)}</p></div>`:''}${season?`<div><h3>Season</h3><span class="fragrance-chip">${esc(season)}</span></div>`:''}${occasions.length?`<div><h3>Occasions</h3><div class="fragrance-chips">${occasions.map(value=>`<span class="fragrance-chip">${esc(value)}</span>`).join('')}</div></div>`:''}</section>`;
@@ -248,7 +251,7 @@ function productCard(product){
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
   let label=soon?'Coming soon':Number(product.new_arrival_weight)>0?'New arrival':Number(product.hot_selling_weight)>0?'Best seller':'';
-  return `<article class="product-card" data-product-id="${esc(product.id)}" data-stock-key="${esc(stockKey(product))}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button>${scentCardHtml(product)}<p class="product-size">${isShoe(product)?'Shoes':esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(isShoe(product)?product.parent_sku||product.id:product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${productActionsHtml(product)}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
+  return `<article class="product-card" data-product-id="${esc(product.id)}" data-stock-key="${esc(stockKey(product))}"><button class="product-photo" type="button" data-action="open-product" data-id="${esc(stockKey(product))}" aria-label="View ${esc(product.name)}">${imageHtml(product)}${label?`<span class="product-image-label ${soon?'soon':''}">${label}</span>`:''}</button><div class="product-info"><button class="product-title" type="button" data-action="open-product" data-id="${esc(stockKey(product))}"><span>${esc(product.name)}</span></button>${scentCardHtml(product)}<p class="product-size">${isCombo(product)?esc(productSpec(product)):isShoe(product)?'Shoes':esc(formatSize(product.ml))}</p><div class="product-meta"><span class="sku">${esc(isShoe(product)?product.parent_sku||product.id:product.id)}</span><strong class="product-price">${Number(product.price)>0?money(product.price):'Price pending'}</strong></div><div class="product-actions">${productActionsHtml(product)}</div><p class="in-order">${added?`${added} in your order`:''}</p></div></article>`;
 }
 
 function renderProducts(){
@@ -260,9 +263,9 @@ function renderProducts(){
   $('products').className=`product-grid${state.view==='list'?' list-view':''}`;
   $('products').setAttribute('aria-busy','false');
   $('products').innerHTML=visible.length?visible.map(productCard).join(''):`<div class="empty-state">${icon('search')}<h3>No products found</h3><p>Try another brand, warehouse or search.</p><button class="secondary-button" type="button" data-action="reset-filters">Clear filters</button></div>`;
-  const noun=state.filters.category==='Shoes'?'shoes':'products';
-  $('collection-title').textContent=state.filters.category==='Shoes'?'Find your next pair':'Find your next favorite';
-  $('fragrance-filters').hidden=state.filters.category==='Shoes';
+  const noun=state.filters.category==='Combo'?'combos':state.filters.category==='Shoes'?'shoes':'products';
+  $('collection-title').textContent=state.filters.category==='Combo'?'Find your perfect combo':state.filters.category==='Shoes'?'Find your next pair':'Find your next favorite';
+  $('fragrance-filters').hidden=['Shoes','Combo'].includes(state.filters.category);
   $('results-count').textContent=`${all.length} ${noun}`;
   $('showing-count').textContent=all.length?`Showing ${visible.length} of ${all.length} ${noun}`:'';
   $('load-more').hidden=visible.length>=all.length;
@@ -303,9 +306,9 @@ function populateFragranceFilters(){
   }
 }
 function populateBrands(){
-  const all=selectProducts(products(),{...defaults,category:state.filters.category==='Shoes'?'Shoes':'All',warehouse:state.filters.warehouse,stockOnly:false});
+  const all=selectProducts(products(),{...defaults,category:['Shoes','Combo'].includes(state.filters.category)?state.filters.category:'All',warehouse:state.filters.warehouse,stockOnly:false});
   const brandNames=new Map();
-  all.forEach(product=>{const name=String(product.brand||'').trim();const key=normalizeText(name);if(key&&!brandNames.has(key))brandNames.set(key,name);});
+  all.forEach(product=>[product.brand,...(product.components||[]).map(p=>p.brand)].forEach(value=>{const name=String(value||'').trim(),key=normalizeText(name);if(key&&!brandNames.has(key))brandNames.set(key,name);}));
   const brands=[...brandNames.values()].sort((a,b)=>a.localeCompare(b,'en',{sensitivity:'base'}));
   $('brand-filter').innerHTML='<option value="all">All brands</option>'+brands.map(brand=>`<option value="${esc(brand)}">${esc(brand)}</option>`).join('');
   if(!brands.includes(state.filters.brand))state.filters.brand='all';
@@ -338,7 +341,7 @@ function chooseCategory(category,scroll=true){
   const switchType=(state.filters.category==='Shoes')!==(category==='Shoes');
   state.filters.category=category;state.limit=24;
   if(switchType){state.filters.brand='all';state.filters.priceRange='any';$('price-filter').value='any';}
-  if(category==='Shoes'){state.filters.season='all';state.filters.occasion='all';}
+  if(['Shoes','Combo'].includes(category)){state.filters.season='all';state.filters.occasion='all';state.filters.brand='all';}
   const priceOptions=category==='Shoes'?[['any','Any price'],['under150','Under $150'],['150to200','$150–$200'],['over200','Over $200']]:[['any','Any price'],['under30','Under $30'],['30to40','$30–$40'],['over40','Over $40']];
   $('price-filter').innerHTML=priceOptions.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
   $('price-filter').value=state.filters.priceRange;
@@ -356,7 +359,7 @@ function updateProductQuantity(reference,delta){
   const existing=cart.find(matches);if(!existing)return;
   const quantity=cart.filter(matches).reduce((sum,item)=>sum+(Number(item.quantity)||0),0)+delta;
   const product=getProduct(reference);
-  if(delta>0&&(!product||isComingSoon(product)||quantity>window.getOrderStockLimit(product))){showToast('You’ve reached the available stock for this warehouse.');return;}
+  if(delta>0&&(!product||isComingSoon(product)||quantity>cartProductLimit(product,readCart(),products()))){showToast('You’ve reached the available stock for this warehouse.');return;}
   const next=cart.filter(item=>!matches(item)||item===existing);
   // Keep the saved price and size; quantity changes must not bypass checkout approval.
   if(quantity>0)existing.quantity=quantity;
@@ -371,7 +374,7 @@ function setProductQuantity(reference,value){
   const current=quantityForReference(reference,cart);
   const product=getProduct(reference);
   if(state.checking){showToast('Please wait while your order is being checked.');return false;}
-  const result=validateOrderQuantity(value,window.getOrderStockLimit(product));
+  const result=validateOrderQuantity(value,cartProductLimit(product,readCart(),products()));
   if(!result.ok){
     showToast(result.reason==='stock'?`This warehouse allows up to ${result.limit} pcs. Your saved quantity was not changed.`:'Enter a whole number of 0 or more. Your saved quantity was not changed.');
     return false;
@@ -424,7 +427,7 @@ function commitQuantityInput(input,{blur=false}={}){
     showToast('This item was removed in another window. Add it again before setting a quantity.');return;
   }
   const product=getProduct(input.dataset.id);
-  const validated=validateOrderQuantity(value,window.getOrderStockLimit(product));
+  const validated=validateOrderQuantity(value,cartProductLimit(product,readCart(),products()));
   // A zero draft must not remain visible after cancelling the removal dialog.
   input.value=validated.ok&&validated.quantity>0?String(validated.quantity):String(current);
   if(validated.ok&&validated.quantity===0&&current>0){
@@ -471,7 +474,7 @@ function detailOrderActionsHtml(product){
   }
   const soon=isComingSoon(product);
   const added=quantityInCart(product);
-  return `${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`${isShoe(product)||isGiftSet(product)?'Full price · No volume discount.':'Volume discounts apply to eligible perfumes only.'} Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}`;
+  return `${soon?`<button type="button" class="primary-button detail-add" disabled>Arriving soon</button>`:added?`<div class="detail-quantity"><span>Quantity in order</span>${stepper(product)}</div><button type="button" class="primary-button detail-continue" data-action="close-product">Continue shopping ${icon('arrow-right')}</button>`:`<button type="button" class="primary-button detail-add" data-action="add" data-id="${esc(stockKey(product))}" ${remainingStock(product)<=0||state.checking?'disabled':''}>${icon('shopping-cart')}Add to order</button>`}<p class="detail-note">${soon?'This item will be available to order after it arrives.':`${isCombo(product)||isShoe(product)||isGiftSet(product)?'Full price · No volume discount.':'Volume discounts apply to eligible perfumes only.'} Shipping: ${esc(storefront.shippingLabel)}.`}</p>${added?`<p class="in-order">${added} in your order</p>`:''}`;
 }
 
 function updateDetailOrderActions(product){
@@ -503,6 +506,10 @@ function detailGenderHtml(product){
   return `<span class="detail-gender" aria-label="For ${label}">${icon(symbol)}${label}</span>`;
 }
 
+function comboContentsHtml(product){
+  if(!isCombo(product))return '';
+  return `<section class="combo-contents" aria-label="Included in this combo"><h3>Included in this combo</h3>${product.components.map(p=>`<div class="combo-component"><img src="${esc(p.img)}" alt="" loading="lazy"><div><strong>${esc(p.name)}</strong><small>${esc(p.sku)} · ${esc(formatSize(p.ml))}</small></div><span>× ${p.quantity}</span></div>`).join('')}</section>`;
+}
 function shoeSizesHtml(product){
   if(!isShoe(product))return '';
   const variants=withShoeVariants(product).variants.filter(p=>String(p.size||'').trim());
@@ -514,7 +521,7 @@ function renderDetail(product,{resetScroll=false}={}){
   const scrollTop=resetScroll?0:($('product-detail').querySelector('.detail-body')?.scrollTop||0);
   const soon=isComingSoon(product);
   const warehouse=normalizeWarehouse(product.warehouse);
-  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${isShoe(product)?(state.shoeSelected?esc(productSpec(product)):'Select your size'):esc(formatSize(product.ml))+detailGenderHtml(product)}</p><span class="sku">${esc(isShoe(product)&&!state.shoeSelected?product.parent_sku||product.id:product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span>${fragranceDetailHtml(product)}${shoeSizesHtml(product)}</div></div><div class="detail-order-actions">${detailOrderActionsHtml(product)}</div></div>`;
+  $('product-detail').innerHTML=`<div class="detail-layout"><div class="detail-body" tabindex="0" role="region" aria-label="Product details"><div class="detail-media"><div class="detail-photo">${imageHtml(product)}</div><p class="image-caption">Product photo</p></div><div class="detail-copy"><span class="eyebrow">${esc(product.brand)}</span><h2 id="detail-title">${esc(product.name)}</h2><p class="product-size">${isShoe(product)?(state.shoeSelected?esc(productSpec(product)):'Select your size'):esc(productSpec(product))+detailGenderHtml(product)}</p><span class="sku">${esc(isShoe(product)&&!state.shoeSelected?product.parent_sku||product.id:product.id)}</span><p class="detail-price">${Number(product.price)>0?money(product.price):'Price pending'}</p><span class="stock-status ${soon?'coming-soon':''}">${icon(soon?'clock':'circle-check-filled')}${soon?'Arriving soon':`In stock (${esc(warehouse)} Warehouse)`}</span>${fragranceDetailHtml(product)}${comboContentsHtml(product)}${shoeSizesHtml(product)}</div></div><div class="detail-order-actions">${detailOrderActionsHtml(product)}</div></div>`;
   const body=$('product-detail').querySelector('.detail-body');
   if(body)body.scrollTop=scrollTop;
   restoreFocus($('product-detail'),focus);
@@ -537,10 +544,10 @@ function openProduct(id){
 function cartLine(item,index){
   const product=window.getCartProduct(item,products());
   const allocated=product?quantityInCart(product):0;
-  const max=window.getOrderStockLimit(product);
+  const max=cartProductLimit(product,readCart(),products());
   const title=String(item.caption||item.name).replace(new RegExp(`^${String(item.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*-\\s*`),'');
   const reference=window.cartStockKey(item.name,item.warehouse);
-  return `<article class="cart-line"><img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy"><div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(productSpec(item))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(reference)}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(reference,title,quantityForReference(reference))}<button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
+  return `<article class="cart-line">${isCombo(item)&&!item.img?`<div class="cart-line-image">${imageHtml(item)}</div>`:`<img class="cart-line-image" src="${esc(item.img)}" alt="${esc(title)}" loading="lazy">`}<div class="cart-line-info"><h3>${esc(title)}</h3><span class="cart-line-size">${esc(productSpec(item))}</span><span class="sku">${esc(item.name)}</span><div class="cart-line-price">${money(item.price)}</div></div><div class="cart-line-controls"><div class="quantity-stepper" data-stock-key="${esc(reference)}"><button type="button" aria-label="Decrease ${esc(title)} quantity" data-action="cart-minus" data-index="${index}" ${state.checking?'disabled':''}>−</button>${quantityInputHtml(reference,title,quantityForReference(reference))}<button type="button" aria-label="Increase ${esc(title)} quantity" data-action="cart-plus" data-index="${index}" ${state.checking||allocated>=max?'disabled':''}>+</button></div><button type="button" class="remove-line" aria-label="Remove ${esc(title)}" data-action="remove-line" data-index="${index}" ${state.checking?'disabled':''}>${icon('trash')}</button></div></article>`;
 }
 
 function warehouseSummaryText(summary){return `${summary.qty} ${summary.qty===1?'pc':'pcs'} · ${money(summary.subtotal)} before discount`;}
@@ -556,7 +563,7 @@ function updateWarehouseHeadings(cart){
 function cartSummaryHtml(summary){
   const percent=window.formatDiscountPercent(summary.discountPercent);
   const next=tierSchedule.find(tier=>tier.min>summary.discountQty);
-  return `<h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div>${summary.fullPriceQty?`<div class="summary-line"><span>Eligible perfumes (${summary.discountQty})</span><span>${money(summary.discountSubtotal)}</span></div><div class="summary-line"><span>Full-price shoes / sets (${summary.fullPriceQty})</span><span>${money(summary.fullPriceSubtotal)}</span></div>`:''}<div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.discountQty} more ${next.min-summary.discountQty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off eligible perfumes.`:'Your maximum eligible perfume discount is applied.'}<br>Shoes and gift sets stay full price and do not count toward discount tiers.<br>${shippingNote}</div>`;
+  return `<h3>Order summary</h3><div class="summary-line"><span>Items (${summary.qty})</span><span>${money(summary.subtotal)}</span></div>${summary.fullPriceQty?`<div class="summary-line"><span>Eligible perfumes (${summary.discountQty})</span><span>${money(summary.discountSubtotal)}</span></div><div class="summary-line"><span>Full-price items (${summary.fullPriceQty})</span><span>${money(summary.fullPriceSubtotal)}</span></div>`:''}<div class="summary-line"><span>Volume discount (${percent}%)</span><span class="discount-value">−${money(summary.discountAmount)}</span></div><div class="summary-line total"><span>${storefront.freeShipping?'Total amount':'Product total'}</span><span>${money(summary.totalAmount)}</span></div><div class="summary-line shipping"><span>Shipping</span><span>${esc(storefront.shippingLabel)}</span></div><div class="discount-note">${next?`Add ${next.min-summary.discountQty} more ${next.min-summary.discountQty===1?'item':'items'} for ${window.formatDiscountPercent(next.percent)}% off eligible perfumes.`:'Your maximum eligible perfume discount is applied.'}<br>Shoes, gift sets and combos stay full price and do not count toward discount tiers.<br>${shippingNote}</div>`;
 }
 
 function renderCart(){
@@ -578,7 +585,7 @@ function renderCart(){
       const allocated=product?quantityInCart(product):0;
       syncQuantityInput(line.querySelector('.quantity-input'),quantityForReference(window.cartStockKey(item.name,item.warehouse),cart));
       minus.disabled=state.checking;
-      line.querySelector('[data-action="cart-plus"]').disabled=state.checking||allocated>=window.getOrderStockLimit(product);
+      line.querySelector('[data-action="cart-plus"]').disabled=state.checking||allocated>=cartProductLimit(product,readCart(),products());
       line.querySelector('[data-action="remove-line"]').disabled=state.checking;
     });
     updateWarehouseHeadings(cart);
@@ -626,10 +633,11 @@ function composeOrder(cart){
       const suffix=size&&!caption.replace(/\s/g,'').toLowerCase().includes(size.replace(/\s/g,'').toLowerCase())?` · ${size}`:'';
       // Put the ordered quantity before gift-set names/specs containing x4/x6.
       text+=`• ${item.name} × ${item.quantity}${title?` - ${title}`:''}${suffix}\n  Unit ${money(item.price)} = Line subtotal *${money(cents(item.price)*Number(item.quantity)/100)}*\n`;
+      if(isCombo(item))text+=`  Includes: ${(item.components||[]).map(p=>`${p.sku} (${p.quantity} per combo)`).join(', ')}\n`;
     });
     text+='\n';
   });
-  text+=`----------------------------\nLV Quantity: ${summary.lvQty}\nOther Quantity: ${summary.otherQty}\n*Total Quantity: ${summary.qty} pcs*\n----------------------------\nDiscount-eligible perfumes: ${summary.discountQty} pcs\nFull-price shoes / sets: ${summary.fullPriceQty} pcs\nSubtotal: ${money(summary.subtotal)}\nDiscount (${window.formatDiscountPercent(summary.discountPercent)}%): -${money(summary.discountAmount)}\nShoes and gift sets are excluded from volume discounts.\nShipping: ${storefront.shippingLabel}\n*${storefront.freeShipping?'Total Amount':'Total Amount (excl. shipping)'}:* ${money(summary.totalAmount)}`;
+  text+=`----------------------------\nLV Quantity: ${summary.lvQty}\nOther Quantity: ${summary.otherQty}\n*Total Quantity: ${summary.qty} pcs*\n----------------------------\nDiscount-eligible perfumes: ${summary.discountQty} pcs\nFull-price items: ${summary.fullPriceQty} pcs\nSubtotal: ${money(summary.subtotal)}\nDiscount (${window.formatDiscountPercent(summary.discountPercent)}%): -${money(summary.discountAmount)}\nShoes, gift sets and combos are excluded from volume discounts.\nShipping: ${storefront.shippingLabel}\n*${storefront.freeShipping?'Total Amount':'Total Amount (excl. shipping)'}:* ${money(summary.totalAmount)}`;
   return text;
 }
 

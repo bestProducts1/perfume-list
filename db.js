@@ -7,11 +7,13 @@ const SHEET_URL =
 
 const SHOES_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFWYImNbJ0ao5z0VDk_VZwhOP1pnY2UZdFuwxtYOvKaNfEX4sInJh7uk-MlRSH9kffdZ5TjzhudLao/pub?gid=531106001&single=true&output=csv";
 
+const COMBOS_SHEET_URL = SHOES_SHEET_URL.replace('gid=531106001','gid=826113014');
+
 // 缓存时间 (1分钟)
 const CACHE_DURATION = 1 * 60 * 1000;
-const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_Catalog_Data_V15_Sizes";
-const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_Catalog_Time_V15_Sizes";
-const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_Catalog_Last_Valid_Data_V15_Sizes";
+const PRODUCT_CACHE_KEY = "perfumeDB_BestProducts_PerfumeList_Data_V17_Combos";
+const PRODUCT_TIME_KEY = "perfumeDB_BestProducts_PerfumeList_Time_V17_Combos";
+const PRODUCT_FALLBACK_KEY = "perfumeDB_BestProducts_PerfumeList_Last_Valid_Data_V17_Combos";
 const CATALOG_DISCOUNT_TIERS = window.STOREFRONT_CONFIG.discountTiers;
 const SHIPPING_LABEL = window.STOREFRONT_CONFIG.shippingLabel;
 // GitHub Pages sites share an origin, so each storefront needs its own cart.
@@ -90,13 +92,19 @@ async function fetchLatestProductData() {
         const text=await response.text();
         const headers=text.replace(/^\uFEFF/,'').split(/\r?\n/)[0].split(',').map(v=>v.trim().replace(/^"|"$/g,'').toLowerCase());
         if(shoeFeed&&!['sku','parent_sku','size','stock','price'].every(key=>headers.includes(key)))throw new Error('The shoe inventory data is incomplete.');
-        const rows=parseCSV(text).filter(p=>String(p.id||'').trim()&&String(p.warehouse||'').trim()&&String(p.name||'').trim()&&(Number(p.price)>0||Number(p.coming_soon_weight)>0));
+        const rows=parseCSV(text).filter(p=>String(p.id||'').trim()&&String(p.warehouse||'').trim()&&String(p.name||'').trim());
         if(shoeFeed&&rows.some(p=>!/^([A-Z]+)-XZ-/i.test(p.id)))throw new Error('Unexpected product in the shoe inventory.');
         return shoeFeed?rows:rows.filter(p=>!/^([A-Z]+)-XZ-/i.test(p.id));
       };
       const [fragrances,shoes]=await Promise.all([readFeed(SHEET_URL),readFeed(SHOES_SHEET_URL,true)]);
       if(!fragrances.length)throw new Error('The inventory data is incomplete.');
-      const products=[...fragrances,...shoes];
+      const comboResponse=await fetch(`${COMBOS_SHEET_URL}&_=${Date.now()}`,{cache:'no-store',signal:controller.signal});
+      if(!comboResponse.ok)throw Error('Could not load the latest combos.');
+      const comboText=await comboResponse.text();
+      const comboHeaders=comboText.replace(/^\uFEFF/,'').split(/\r?\n/)[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+      if(!['sku','name','items','price_catalog','price_perfume_list','image_url'].every(h=>comboHeaders.includes(h)))throw Error('The combo data is incomplete.');
+      const combos=window.CatalogProductPolicy.combos(parseCSV(comboText),fragrances,window.STOREFRONT_CONFIG.siteId);
+      const products=[...fragrances,...shoes,...combos];
       if (!products.length) {
         throw new Error("The inventory data is incomplete. Please try again later.");
       }
@@ -182,7 +190,7 @@ function reconcileCart(items, products) {
     }
     const key = cartStockKey(product.id, product.warehouse);
     const rawQuantity = Number(item.quantity);
-    const remaining = Math.max(0, limit - (allocated.get(key) || 0));
+    const remaining = Math.max(0, window.CatalogProductPolicy.cartLimit(product,updatedItems,products) - (allocated.get(key) || 0));
     const quantity = Number.isFinite(rawQuantity)
       ? Math.max(0, Math.min(Math.floor(rawQuantity), remaining)) : 0;
     if (!quantity) {
@@ -196,6 +204,7 @@ function reconcileCart(items, products) {
     if (Number(item.price) !== Number(product.price)) {
       changes.push(`${label}: price $${(Number(item.price) || 0).toFixed(2)} → $${Number(product.price).toFixed(2)}.`);
     }
+    if(window.CatalogProductPolicy.isCombo(product)&&JSON.stringify((item.components||[]).map(p=>[p.sku,p.quantity]))!==JSON.stringify(product.components.map(p=>[p.sku,p.quantity])))changes.push(`${label}: combo contents updated; review the included products.`);
     const size = String(product.ml ?? "").trim();
     if (String(item.ml ?? "").trim() !== size) {
       changes.push(`${label}: size updated to ${formatOrderSize(size) || "not specified"}.`);
@@ -309,7 +318,7 @@ function buildWhatsAppOrderMessage(items, discountTiers) {
   message += `Full-price items: ${policySummary.fullPriceQty} pcs\n`;
   message += `Subtotal: $${subtotal.toFixed(2)}\n`;
   message += `Discount (${formatDiscountPercent(discountPercent)}%): -$${discountAmount.toFixed(2)}\n`;
-  message += `Shoes and gift sets are excluded from volume discounts.\n`;
+  message += `Shoes, gift sets and combos are excluded from volume discounts.\n`;
   message += `Shipping: ${shipping === 0 ? "FREE" : "$" + shipping.toFixed(2)}\n`;
   message += `*Total Amount:* $${finalTotal.toFixed(2)}`;
   return message;

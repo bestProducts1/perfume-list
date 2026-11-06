@@ -11,7 +11,7 @@ const isCatalog = root.pathname.endsWith('/catalog/');
 const site = isCatalog ? {
   id: 'catalog', gid: 0, whatsapp: '17253041220', shipping: 'Calculated Separately', freeShipping: false,
   sheet: '2PACX-1vSaFTXofUSG63pjWela7csIA57AcA6rqrhb26_p_NKQ73P8ofYD3Ec4JDqGPVEUv6Fe3HWDpsj8ldaE',
-  cache: 'perfumeDB_BestProducts_Catalog_Data_V16_Sizes',
+  cache: 'perfumeDB_BestProducts_Catalog_Data_V17_Combos',
   tiers: [
     { min: 1, max: 10, percent: 0 }, { min: 11, max: 20, percent: .035 },
     { min: 21, max: 40, percent: .08 }, { min: 41, max: Infinity, percent: .12 },
@@ -19,7 +19,7 @@ const site = isCatalog ? {
 } : {
   id: 'perfume-list', gid: 1967485424, whatsapp: '16232027321', shipping: 'FREE', freeShipping: true,
   sheet: '2PACX-1vRFWYImNbJ0ao5z0VDk_VZwhOP1pnY2UZdFuwxtYOvKaNfEX4sInJh7uk-MlRSH9kffdZ5TjzhudLao',
-  cache: 'perfumeDB_BestProducts_Catalog_Data_V15_Sizes',
+  cache: 'perfumeDB_BestProducts_PerfumeList_Data_V17_Combos',
   tiers: [
     { min: 1, max: 1, percent: 0 }, { min: 2, max: 2, percent: .03 },
     { min: 3, max: 4, percent: .05 }, { min: 5, max: 9, percent: .08 },
@@ -37,6 +37,46 @@ const item = (overrides = {}) => ({
   brand: 'Bond No. 9', price: 33, quantity: 1, ml: '100', img: 'photo.webp', ...overrides,
 });
 const csvFor = (p) => `id,warehouse,name,stock,price,ml,brand\n${p.id},${p.warehouse},${p.name},${p.stock},${p.price},${p.ml},${p.brand}`;
+
+const comboRow={sku:'TX-CB-001',name:'Two Fragrance Combo',items:'TX-A055*2+TX-A056*1',price_catalog:'80',price_perfume_list:'100',image_url:''};
+const comboFixture=s=>{const parts=[product({stock:19}),product({id:'TX-A056',stock:40})];const combo=model.buildComboProducts([comboRow],parts,site.id)[0];s.perfumeDB=[...parts,combo];return {parts,combo,make:(p,q)=>({...model.productIdentity(p),...item({name:p.id,caption:p.id+' - '+p.name,price:p.price,ml:p.ml||'',quantity:q})})};};
+
+test('combo feed materializes own prices and a failed combo refresh never replaces the complete inventory',async()=>{
+ const c=createContext(),s=c.sandbox;
+ s.fetch=async()=>({ok:true,text:async()=>csvFor(product({stock:19}))+'\nTX-A056,TX,Second,40,33,100,Creed'});
+ s.comboFeed=async()=>({ok:true,text:async()=> 'sku,name,items,price_catalog,price_perfume_list,image_url\nTX-CB-001,Two Fragrance Combo,TX-A055*2+TX-A056*1,80,100,'});
+ const result=await s.fetchLatestProductData(),combo=result.find(model.isCombo);assert.equal(combo.price,site.id==='catalog'?80:100);assert.equal(s.getOrderStockLimit(combo),9);
+ const saved=JSON.stringify(result);s.comboFeed=async()=>({ok:false});await assert.rejects(()=>s.fetchLatestProductData());assert.equal(JSON.stringify(s.perfumeDB),saved);
+});
+test('a priced combo does not require its physical components to have standalone selling prices',async()=>{
+ const c=createContext(),s=c.sandbox;
+ s.fetch=async()=>({ok:true,text:async()=>csvFor(product({stock:19,price:''}))+'\nTX-A056,TX,Second,40,33,100,Creed'});
+ s.comboFeed=async()=>({ok:true,text:async()=> 'sku,name,items,price_catalog,price_perfume_list,image_url\nTX-CB-001,Two Fragrance Combo,TX-A055*1+TX-A056*1,80,100,'});
+ const rows=await s.fetchLatestProductData();assert.equal(s.getOrderStockLimit(rows.find(model.isCombo)),19);assert.equal(model.selectProducts(rows,{category:'Combo'}).length,1);
+ assert.equal(model.selectProducts(rows,{category:'All'}).some(p=>p.id==='TX-A055'),false);
+});
+test('combo and standalone quantity controls cannot allocate the same physical stock twice',()=>{
+ const c=createContext(),s=c.sandbox,{parts,combo,make}=comboFixture(s);
+ c.setCart([make(combo,9)]);assert.equal(s.setProductQuantity('TX-A055::TX',2),false);
+ assert.equal(s.setProductQuantity('TX-A055::TX',1),true);s.updateProductQuantity('TX-CB-001::TX',1);
+ assert.equal(c.cart().find(p=>p.name==='TX-CB-001').quantity,9);
+ s.updateProductQuantity('TX-CB-001::TX',-1);assert.equal(s.setProductQuantity('TX-A055::TX',3),true);
+ assert.ok(s.productCard(combo).includes('3 pcs / combo'));assert.ok(s.comboContentsHtml(combo).includes('TX-A056'));assert.ok(s.comboContentsHtml(combo).includes('× 2'));
+});
+test('checkout reconciles shared combo stock, reviews component changes, and removes unavailable or unpriced combos',()=>{
+ const c=createContext(),s=c.sandbox,{parts,combo,make}=comboFixture(s),data=s.perfumeDB;
+ const checked=s.reconcileCart([make(combo,9),make(parts[0],2)],data);assert.equal(checked.items[1].quantity,1);assert.match(checked.changes.join(' '),/quantity 2 → 1/);
+ const changed=JSON.parse(JSON.stringify(combo));changed.components[0].quantity=1;
+ assert.match(s.reconcileCart([make(combo,1)],[...parts,changed]).changes.join(' '),/contents updated/);
+ const low=model.buildComboProducts([comboRow],[{...parts[0],stock:18},parts[1]],site.id)[0];assert.equal(s.reconcileCart([make(combo,1)],[...parts,low]).items.length,0);
+ assert.equal(s.reconcileCart([make(combo,1)],parts).items.length,0);
+});
+test('combo quote shows parent quantity once, includes components without duplicate order markers and stays full price',()=>{
+ const c=createContext(),s=c.sandbox,{combo,make}=comboFixture(s),cart=[make(combo,2)];c.setCart(cart);s.updateOrderUI();s.renderCart();
+ const text=s.composeOrder(cart);assert.match(text,/TX-CB-001 × 2/);assert.match(text,/Includes: TX-A055 \(2 per combo\), TX-A056 \(1 per combo\)/);
+ assert.equal((text.match(/TX-A055 ×/g)||[]).length,0);assert.equal(model.getOrderSummary(cart,site.tiers,s.perfumeDB).discountAmount,0);
+ assert.ok(c.element('cart-body').innerHTML.includes('Full-price items (2)'));
+});
 
 test('dual feeds load together, preserve size metadata, and fail closed on partial inventory failure',async()=>{
   const c=createContext(),s=c.sandbox;
@@ -56,7 +96,7 @@ test('all quote surfaces exempt shoes and gift sets, and keep eligible perfume t
   const cart=[make(p,2),make(shoe,3),make(gift,4)];c.setCart(cart);s.updateOrderUI();s.renderCart();
   const expected=model.getOrderSummary(cart,site.tiers,s.perfumeDB);
   assert.equal(c.element('mobile-order-total').textContent,'$'+expected.totalAmount.toFixed(2));assert.equal(expected.discountQty,2);
-  assert.ok(c.element('cart-body').innerHTML.includes('Full-price shoes / sets (7)'));
+  assert.ok(c.element('cart-body').innerHTML.includes('Full-price items (7)'));
   for(const text of [s.composeOrder(cart),s.buildWhatsAppOrderMessage(cart,site.tiers)]){assert.ok(text.includes('Size 40'));assert.ok(text.includes('$'+expected.totalAmount.toFixed(2)));assert.ok(text.includes('2 pcs'));assert.ok(text.includes('excluded from volume discounts'));}
   const noDiscount=[make(shoe,9),make(gift,3)];c.setCart(noDiscount);s.updateOrderUI();assert.equal(c.element('mobile-order-savings').hidden,true);
 });
@@ -228,7 +268,8 @@ function createContext({ initialStorage = [], sharedStorage, storefrontId = site
   // dual-feed tests set shoeFeed themselves to exercise real shoe failures/data.
   let productFetch=sandbox.fetch;
   sandbox.shoeFeed=async()=>({ok:true,text:async()=> 'sku,parent_sku,name,size,stock,price\n'});
-  Object.defineProperty(sandbox,'fetch',{get:()=>((url,options)=>String(url).includes('gid=531106001')?sandbox.shoeFeed(url,options):productFetch(url,options)),set:fn=>{productFetch=fn;}});
+  sandbox.comboFeed=async()=>({ok:true,text:async()=> 'sku,name,items,price_catalog,price_perfume_list,image_url\n'});
+  Object.defineProperty(sandbox,'fetch',{get:()=>((url,options)=>String(url).includes('gid=531106001')?sandbox.shoeFeed(url,options):String(url).includes('gid=826113014')?sandbox.comboFeed(url,options):productFetch(url,options)),set:fn=>{productFetch=fn;}});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(source('storefront-config.js'), sandbox, { filename: 'storefront-config.js' });
@@ -1677,8 +1718,8 @@ test('SKU handoff helper loads before product data and its receiver cache versio
   const html = source('index.html');
   assert.match(html, /inquiry-sync\.js\?v=20261009-manual-sku-sync/);
   assert.ok(html.indexOf('inquiry-sync.js') < html.indexOf('db.js'));
-  assert.match(html, /app\.mjs\?v=20261106-shoe-sizes/);
-  assert.match(html, /db\.js\?v=20261106-shoe-sizes/);
+  assert.match(html, /app\.mjs\?v=20261106-combos/);
+  assert.match(html, /db\.js\?v=20261106-combos/);
 });
 
 test('a SKU handoff replaces the scoped order with exact own warehouse products and own quote metadata', () => {

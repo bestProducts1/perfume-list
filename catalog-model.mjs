@@ -1,3 +1,7 @@
+import {isCombo,comboStockLimit,buildComboProducts,comboIdentity,componentCartLimit,parseComboItems} from './combo-model.mjs?v=20261106-combos';
+export {isCombo,comboStockLimit,buildComboProducts,parseComboItems};
+export function cartProductLimit(product,cart=[],catalog=[]){return componentCartLimit(product,cart,catalog,orderStockLimit(product));}
+
 const MIN_STOCK = 19;
 const BLOCKED_STATUSES = new Set(['OUT OF STOCK', 'MISSING INVENTORY', 'UNAVAILABLE', 'LOW / HIDDEN']);
 const STOPWORDS = new Set(['a', 'an', 'and', 'de', 'el', 'for', 'la', 'le', 'of', 'the']);
@@ -61,9 +65,9 @@ export function searchProducts(products, query = '') {
       name: normalizeText(product.name),
       size: normalizeText(formatSize(product.ml)),
     };
-    const haystack = `${fields.id} ${fields.brand} ${fields.name} ${fields.size}`;
+    const haystack = `${fields.id} ${fields.brand} ${fields.name} ${fields.size} ${normalizeText((product.components||[]).map(p=>`${p.sku} ${p.name} ${p.brand}`).join(" "))}`;
     const words = haystack.split(' ');
-    const matches = (!brandMatch || brandSearchKey(product.brand) === brandSearchKey(brandMatch.brand)) &&
+    const matches = (!brandMatch || [product.brand,...(product.components||[]).map(p=>p.brand)].some(brand=>brandSearchKey(brand)===brandSearchKey(brandMatch.brand))) &&
       (tokens.length ? tokens.every((token) => token.length <= 2 ? words.includes(token) : haystack.includes(token)) : Boolean(brandMatch));
     const score = tokens.reduce((total, token) => total +
       (fields.id.includes(token) ? 100 : 0) + (fields.brand.includes(token) ? 60 : 0) +
@@ -85,6 +89,7 @@ function positiveWeight(product, field) {
 }
 
 function isOrderable(product) {
+  if(isCombo(product))return orderStockLimit(product)>0;
   const price = Number(product?.price);
   const status = String(product?.stock_status || '').trim().toUpperCase();
   if (!Number.isFinite(price) || price <= 0 || BLOCKED_STATUSES.has(status) || isComingSoon(product)) return false;
@@ -103,15 +108,16 @@ function warehouseCode(value) {
 export function isShoe(product) { return /^[A-Z]+-XZ-/i.test(String(product?.id || product?.sku || product?.name || '').trim()); }
 
 export function isGiftSet(product){
-  if(isShoe(product))return false;
+  if(isShoe(product)||isCombo(product))return false;
   const id=String(product?.id||product?.sku||product?.name||'');
   const title=String(product?.name||'')+' '+String(product?.caption||'');
   return /^[A-Z]+-LH-/i.test(id)||/\b(sets?|gift\s*box|bundle|combo|combination)\b|组合|套装|礼盒/i.test(title)||/^box$/i.test(title.trim())||/\d+(?:\.\d+)?\s*ml\s*[*×x]\s*\d+/i.test(String(product?.ml||''));
 }
-export function productIdentity(product){return isShoe(product)?{product_type:'shoe',parent_sku:String(product?.parent_sku||''),size:String(product?.size||'')}:isGiftSet(product)?{product_type:'set'}:{};}
-export function productSpec(product){return isShoe(product)?(String(product?.size||'').trim()? 'Size '+String(product.size).trim():'Size details pending'):formatSize(product?.ml);}
+export function productIdentity(product){return isCombo(product)?comboIdentity(product):isShoe(product)?{product_type:'shoe',parent_sku:String(product?.parent_sku||''),size:String(product?.size||'')}:isGiftSet(product)?{product_type:'set'}:{};}
+export function productSpec(product){return isCombo(product)?`${(product.components||[]).reduce((n,p)=>n+Number(p.quantity||0),0)} pcs / combo`:isShoe(product)?(String(product?.size||'').trim()? 'Size '+String(product.size).trim():'Size details pending'):formatSize(product?.ml);}
 export function orderStockLimit(product){
   if(!product||isComingSoon(product)||!Number.isFinite(Number(product.price))||!(Number(product.price)>0)||BLOCKED_STATUSES.has(String(product.stock_status||'').trim().toUpperCase()))return 0;
+  if(isCombo(product))return comboStockLimit(product);
   if(isShoe(product)){
     const size=String(product.size||'').trim(),parent=String(product.parent_sku||'').trim().toUpperCase();
     if(!size||!parent||String(product.id||product.sku||'').trim().toUpperCase()!==parent+'-'+size.toUpperCase())return 0;
@@ -137,6 +143,8 @@ export function productOccasions(product) {
 }
 
 function categoryMatches(product, category) {
+  if(isCombo(product))return category==='All'||category==='Combo';
+  if(category==='Combo')return false;
   if(category==='Shoes')return isShoe(product);
   if(isShoe(product)&&['Men','Women','Unisex','GiftSets'].includes(category))return false;
   const gender = normalizeText(product.gender || product.target);
@@ -158,13 +166,13 @@ export function selectProducts(products, filters = {}) {
       category === 'HotSelling' || category === 'NewArrival' ? orderable :
         orderable || (filters.stockOnly === false && isComingSoon(product));
     if (!eligible || !categoryMatches(product, category)) return false;
-    if(category!=='Shoes'){
+    if(category!=='Shoes'&&category!=='Combo'){
       const selected=seasonLabel(filters.season),actual=seasonLabel(product.season);
       if(selected&&selected!=='all'&&actual!==selected&&!(actual==='Year-round'&&['Spring / Summer','Fall / Winter'].includes(selected)))return false;
       if(filters.occasion&&filters.occasion!=='all'&&!productOccasions(product).some(value=>normalizeText(value)===normalizeText(filters.occasion)))return false;
     }
     if (warehouse && warehouse !== 'ALL' && warehouseCode(product.warehouse) !== warehouse) return false;
-    if (brand && brand !== 'all' && normalizeText(product.brand) !== brand) return false;
+    if (brand && brand !== 'all' && ![product.brand,...(product.components||[]).map(p=>p.brand)].some(value=>normalizeText(value)===brand)) return false;
     const price = Number(product.price);
     if (priceRange !== 'any' && (!Number.isFinite(price) || price <= 0)) return false;
     if (priceRange === 'under30' && !(price < 30)) return false;
@@ -212,7 +220,7 @@ export function getOrderSummary(items, tiers = [], catalog = []) {
     subtotalCents += priceCents * quantity;
     const current=catalog.find(p=>String(p.id||p.sku).toUpperCase()===String(item.name||item.id||item.sku).toUpperCase()&&warehouseCode(p.warehouse)===warehouseCode(item.warehouse));
     const identity=current||item;
-    if(!isShoe(identity)&&!isGiftSet(identity)&&identity.product_type!=='shoe'&&identity.product_type!=='set'){discountQty+=quantity;discountSubtotalCents+=priceCents*quantity;}
+    if(!isCombo(identity)&&!isShoe(identity)&&!isGiftSet(identity)&&identity.product_type!=='shoe'&&identity.product_type!=='set'){discountQty+=quantity;discountSubtotalCents+=priceCents*quantity;}
     if (`${normalizeText(item.brand)} ${normalizeText(item.caption)}`.replace(/\s+/g, '').includes('louisvuitton')) lvQty += quantity;
   }
   const tier = (Array.isArray(tiers) ? tiers : []).find(({ min, max }) => discountQty >= min && discountQty <= max);
